@@ -2,17 +2,30 @@
 #
 # Hackathon requirement: the Agent Tank submission MUST run against
 # Studio Next (chain 61997), gltest network name `studio_devnet`.
-# Do NOT point `default_network` at `studionet` (61999) or any other chain.
-
-default_network: studio_devnet
-contracts_dir: contracts
-artifacts_dir: artifacts
-environment: .env
+# Do NOT point at `studionet` (61999) or any other chain.
+#
+# Select this network explicitly with: gltest --network studio_devnet ...
 
 networks:
+  default: studio_devnet
   studio_devnet:
-    id: 61997
-    # gltest/genlayer-py ship a built-in `studio_devnet` chain definition;
-    # this url is set explicitly to pin it to the hackathon RPC even if the
-    # SDK's bundled default ever drifts.
     url: https://studio-next.genlayer.com/api
+    # Throwaway funded test accounts (buyer, 3 sellers, 1 unauthorized
+    # "attacker" account used for negative-authorization tests, plus a
+    # spare runner account). Private keys are kept only in the gitignored
+    # local .env (see .env.example) - never committed. accounts[0] is the
+    # default signer and is used as the buyer/RFQ-creator in tests.
+    accounts:
+      - ${GLTEST_BUYER_PRIVATE_KEY}
+      - ${GLTEST_SELLER_A_PRIVATE_KEY}
+      - ${GLTEST_SELLER_B_PRIVATE_KEY}
+      - ${GLTEST_SELLER_C_PRIVATE_KEY}
+      - ${GLTEST_ATTACKER_PRIVATE_KEY}
+      - ${GLTEST_RUNNER_PRIVATE_KEY}
+    from: ${GLTEST_BUYER_PRIVATE_KEY}
+
+paths:
+  contracts: contracts
+  artifacts: artifacts
+
+environment: .env

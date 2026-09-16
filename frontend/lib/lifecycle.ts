@@ -4,6 +4,7 @@ export type LifecycleAction =
   | "close_bidding"
   | "filter_hard_constraints"
   | "judge_award"
+  | "retry_judgment"
   | "accept_award";
 
 /**
@@ -18,14 +19,19 @@ export function allowedActions(params: {
   isCreator: boolean;
   bidCount: number;
   accepted: boolean;
+  judgmentAttempts: number;
+  maxJudgmentAttempts: number;
 }): LifecycleAction[] {
-  const { state, isCreator, bidCount, accepted } = params;
+  const { state, isCreator, bidCount, accepted, judgmentAttempts, maxJudgmentAttempts } = params;
   if (!isCreator) return [];
 
   const actions: LifecycleAction[] = [];
   if (state === "OPEN" && bidCount > 0) actions.push("close_bidding");
   if (state === "BIDDING_CLOSED") actions.push("filter_hard_constraints");
   if (state === "FILTERED") actions.push("judge_award");
+  if (state === "NEEDS_CLARIFICATION" && judgmentAttempts < maxJudgmentAttempts) {
+    actions.push("retry_judgment");
+  }
   if (state === "AWARDED" && !accepted) actions.push("accept_award");
   return actions;
 }

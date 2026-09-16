@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useWallet } from "@/lib/wallet-context";
-import { sha256Hex } from "@/lib/hash";
 import { createRfq, submitBid, listRfqIds, type WriteLifecycleState } from "@/lib/genlayer/contract";
 import { LifecycleTrack } from "@/components/LifecycleTrack";
 
@@ -70,6 +69,17 @@ const SCENARIOS: Scenario[] = [
   },
 ];
 
+const RETRY_NOTE =
+  "4. Recovery / retry — not a one-click scenario here. After running the " +
+  "uncertainty case above (or any RFQ that lands on NEEDS_CLARIFICATION), " +
+  "open that RFQ and use its \"Retry judgment\" button. retry_judgment() " +
+  "re-runs consensus over the exact same soft_policy_text and bid set — " +
+  "it takes no other parameters, so nothing about the RFQ can be rewritten " +
+  "between attempts. It stays fail-closed: it only reaches AWARDED once " +
+  "evidence genuinely supports a winner, and returns NEEDS_CLARIFICATION " +
+  "again otherwise. Attempts are capped (see the RFQ page for the " +
+  "remaining count).";
+
 export default function DemoPage() {
   const { address, connect } = useWallet();
   const [running, setRunning] = useState<string | null>(null);
@@ -88,19 +98,14 @@ export default function DemoPage() {
     setLog([]);
     setCreatedRfqId(null);
     try {
-      setLog((l) => [...l, "Hashing RFQ spec and soft policy…"]);
-      const rfqHash = await sha256Hex(`${scenario.title}-${Date.now()}`);
-      const policyHash = await sha256Hex(SOFT_POLICY);
-
       setLog((l) => [...l, "Creating RFQ (wallet signature required)…"]);
       const created = await createRfq(
         address,
         {
-          rfqHash,
+          rfqSpecText: `${scenario.title} - ${scenario.description} (run ${Date.now()})`,
           deadline: Math.floor(Date.now() / 1000) + 3600,
           hardBudgetCents: Math.round(scenario.budgetUsd * 100),
           hardLatencyMsMax: scenario.latencyMs,
-          softPolicyHash: policyHash,
           softPolicyText: SOFT_POLICY,
         },
         setState
@@ -121,7 +126,6 @@ export default function DemoPage() {
           address,
           {
             rfqId: newRfqId,
-            bidHash: await sha256Hex(bid.label),
             priceCents: Math.round(bid.price * 100),
             latencyMs: bid.latency,
             evidenceUrl: bid.evidenceUrl,
@@ -171,6 +175,11 @@ export default function DemoPage() {
           </button>
         </div>
       ))}
+
+      <div className="card">
+        <h3>4. Recovery / retry</h3>
+        <p className="small">{RETRY_NOTE}</p>
+      </div>
 
       {(log.length > 0 || error) && (
         <div className="card">

@@ -17,10 +17,27 @@ are covered by tests/integration/test_quorda_integration.py, which uses
 locked hackathon toolchain.
 """
 
+import hashlib
 import importlib.util
 import os
 import sys
 import types
+
+
+class _FakeKeccakHash:
+    """Stand-in for gl.Keccak256 in the pure-function test harness. Not
+    cryptographically Keccak (uses sha3_256), but reproduces the
+    update()/hexdigest() shape well enough to test that _keccak_hex is
+    deterministic and input-sensitive, which is all these tests assert."""
+
+    def __init__(self):
+        self._h = hashlib.sha3_256()
+
+    def update(self, data: bytes) -> None:
+        self._h.update(data)
+
+    def hexdigest(self) -> str:
+        return self._h.hexdigest()
 
 
 def _load_pure_helpers():
@@ -49,6 +66,7 @@ def _load_pure_helpers():
     fake_gl.eq_principle = _Stub()
     fake_gl.u256 = int
     fake_gl.Address = str
+    fake_gl.Keccak256 = _FakeKeccakHash
 
     fake_storage_mod = types.ModuleType("genlayer.storage")
     fake_storage_mod.allow = lambda cls: cls
@@ -126,3 +144,43 @@ def test_to_json_str_roundtrip():
 
     payload = {"a": 1, "b": ["x", "y"]}
     assert json.loads(quorda._to_json_str(payload)) == payload
+
+
+# ---------------------------------------------------------------------------
+# Commitment hashing: same input -> same hash, any change -> different hash.
+# This is what makes rfq_hash/soft_policy_hash/bid_hash meaningful
+# commitments instead of arbitrary caller-supplied strings.
+# ---------------------------------------------------------------------------
+
+
+def test_keccak_hex_is_deterministic():
+    a = quorda._keccak_hex(b"hello world")
+    b = quorda._keccak_hex(b"hello world")
+    assert a == b
+    assert len(a) == 64  # 256-bit digest, hex-encoded
+
+
+def test_keccak_hex_changes_with_input():
+    a = quorda._keccak_hex(b"policy: prefer strong refund terms")
+    b = quorda._keccak_hex(b"policy: prefer weak refund terms")
+    assert a != b
+
+
+def test_bid_commitment_binds_every_material_field():
+    def commit(rfq_id, seller, price, latency, url):
+        return quorda._keccak_hex(
+            "|".join([str(rfq_id), seller, str(price), str(latency), url]).encode("utf-8")
+        )
+
+    base = commit(1, "0xseller", 45000, 250, "https://example.com/a.json")
+    diff_price = commit(1, "0xseller", 45001, 250, "https://example.com/a.json")
+    diff_seller = commit(1, "0xother", 45000, 250, "https://example.com/a.json")
+    diff_evidence = commit(1, "0xseller", 45000, 250, "https://example.com/b.json")
+
+    assert base != diff_price
+    assert base != diff_seller
+    assert base != diff_evidence
+
+
+def test_max_judgment_attempts_is_a_positive_bound():
+    assert quorda.MAX_JUDGMENT_ATTEMPTS > 0

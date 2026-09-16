@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useWallet } from "@/lib/wallet-context";
-import { sha256Hex } from "@/lib/hash";
 import { createRfq, type WriteLifecycleState } from "@/lib/genlayer/contract";
 import { LifecycleTrack } from "@/components/LifecycleTrack";
 import { explorerTxUrl } from "@/lib/genlayer/chain";
@@ -27,26 +26,17 @@ export default function NewRfqPage() {
   );
 
   const [reviewed, setReviewed] = useState(false);
-  const [rfqHash, setRfqHash] = useState<string | null>(null);
-  const [policyHash, setPolicyHash] = useState<string | null>(null);
 
   const [state, setState] = useState<WriteLifecycleState | null>(null);
   const [failed, setFailed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
 
-  async function handleReview() {
-    setRfqHash(await sha256Hex(rfqSpec));
-    setPolicyHash(await sha256Hex(softPolicy));
-    setReviewed(true);
-  }
-
   async function handleSubmit() {
     if (!address) {
       await connect();
       return;
     }
-    if (!rfqHash || !policyHash) return;
     setError(null);
     setFailed(false);
     setState(null);
@@ -54,11 +44,10 @@ export default function NewRfqPage() {
       const { txHash } = await createRfq(
         address,
         {
-          rfqHash,
+          rfqSpecText: rfqSpec,
           deadline: Math.floor(Date.now() / 1000) + 30 * 24 * 3600,
           hardBudgetCents: Math.round(parseFloat(budgetDollars) * 100),
           hardLatencyMsMax: parseInt(latencyMs, 10),
-          softPolicyHash: policyHash,
           softPolicyText: softPolicy,
         },
         setState
@@ -92,6 +81,9 @@ export default function NewRfqPage() {
         Hard constraints below are enforced deterministically by the contract
         before any GenLayer judgment runs. Soft priorities are natural language
         that GenLayer validators interpret against each surviving bid&apos;s evidence.
+        The RFQ spec hash and policy hash are computed on-chain by the
+        contract from the exact text you submit — they are not values you
+        supply, so they can never point at unrelated content.
       </p>
 
       {!reviewed ? (
@@ -114,7 +106,7 @@ export default function NewRfqPage() {
             <label htmlFor="policy">Soft priorities (natural language, judged by GenLayer)</label>
             <textarea id="policy" rows={4} value={softPolicy} onChange={(e) => setSoftPolicy(e.target.value)} />
           </div>
-          <button className="btn" onClick={handleReview}>Review before submitting →</button>
+          <button className="btn" onClick={() => setReviewed(true)}>Review before submitting →</button>
         </div>
       ) : (
         <div className="card">
@@ -122,8 +114,7 @@ export default function NewRfqPage() {
           <p className="small"><strong>Hard budget:</strong> ${budgetDollars}</p>
           <p className="small"><strong>Hard latency ceiling:</strong> {latencyMs}ms</p>
           <p className="small"><strong>Soft priorities:</strong> {softPolicy}</p>
-          <p className="small dim">RFQ spec hash: <span className="mono">{rfqHash}</span></p>
-          <p className="small dim">Soft policy hash: <span className="mono">{policyHash}</span></p>
+          <p className="small dim">RFQ spec: {rfqSpec}</p>
 
           {state && <LifecycleTrack current={state} failed={failed} />}
           {error && <p className="field-error small">{error}</p>}

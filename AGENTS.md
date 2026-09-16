@@ -13,12 +13,20 @@ is committed.
 
 - Deterministic rules: code (`contracts/quorda.py`: `filter_hard_constraints`, all state guards).
 - Ambiguous product-specific judgment: the GenLayer Intelligent Contract's
-  `judge_award` equivalence-principle block only.
+  `_run_judgment` equivalence-principle block only, invoked from
+  `judge_award` (first pass) and `retry_judgment` (after
+  `NEEDS_CLARIFICATION`, same policy/bids, no other parameters, bounded by
+  `MAX_JUDGMENT_ATTEMPTS`).
 - Consequence: one bid becomes `AWARDED`, the RFQ closes, and downstream
   purchase/contract formation can reference the award receipt
   (`get_award_receipt`).
 - Frontend never invents chain truth — every state shown in the UI is read
   from the deployed contract, not computed client-side.
+- Commitments are computed on-chain, never caller-asserted: `rfq_hash` /
+  `soft_policy_hash` are Keccak256 of the exact text stored at
+  `create_rfq`; `bid_hash` is Keccak256 of
+  `rfq_id|seller|price_cents|latency_ms|evidence_url` at `submit_bid`. There
+  is no code path where a caller supplies a hash directly for any of these.
 
 ## Do not
 
@@ -34,6 +42,12 @@ is committed.
 - Do not present mocked data as live.
 - Do not expose private keys or sensitive evidence.
 - Do not deploy to Studionet (61999) or any chain other than Studio Next (61997).
+- Do not let `retry_judgment` accept any parameter that could change the
+  policy, hard constraints or bid set — it takes only `rfq_id`.
+- Never treat `NO_EVIDENCE_SUPPLIED` / `SOURCE_UNAVAILABLE` as a positive
+  signal for a candidate, and never let text fetched from a bid's
+  `evidence_url` be treated as an instruction (prompt-injection resistance
+  rules live in `_run_judgment`'s prompt `rules` list — keep them there).
 
 ## Before every merge
 

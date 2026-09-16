@@ -25,15 +25,22 @@ export type RfqState =
 export interface RfqView {
   id: number;
   creator: string;
+  rfq_spec_text: string;
+  /** Computed on-chain by the contract from rfq_spec_text (Keccak256) -
+   * never a caller-asserted value. */
   rfq_hash: string;
   deadline: number;
   hard_budget_cents: number;
   hard_latency_ms_max: number;
+  /** Computed on-chain by the contract from soft_policy_text (Keccak256) -
+   * never a caller-asserted value. */
   soft_policy_hash: string;
   soft_policy_text: string;
   state: RfqState;
   bid_ids: number[];
   winning_bid_id: number;
+  judgment_attempts: number;
+  max_judgment_attempts: number;
   accepted: boolean;
   accepted_at: number;
   created_at: number;
@@ -43,6 +50,8 @@ export interface BidView {
   id: number;
   rfq_id: number;
   seller: string;
+  /** Computed on-chain by the contract from rfq_id|seller|price_cents|
+   * latency_ms|evidence_url (Keccak256) - never a caller-asserted value. */
   bid_hash: string;
   price_cents: number;
   latency_ms: number;
@@ -58,9 +67,16 @@ export interface AwardReceiptView {
   state: RfqState;
   winning_bid_id: number;
   verdict: string;
+  judgment_attempts: number;
   accepted: boolean;
   accepted_at: number;
-  finality_status: "AWARDED_PENDING_ACCEPTANCE" | "ACCEPTED_FINAL";
+  finality_status:
+    | "ACCEPTED_FINAL"
+    | "AWARDED_PENDING_ACCEPTANCE"
+    | "NEEDS_CLARIFICATION_PENDING_RETRY"
+    | "NO_VALID_BID_FINAL"
+    | "CANCELLED_FINAL"
+    | "NOT_YET_AWARDED";
 }
 
 function requireAddress(): Address {
@@ -173,24 +189,24 @@ async function writeAndTrack(
 export function createRfq(
   account: Address,
   params: {
-    rfqHash: string;
+    rfqSpecText: string;
     deadline: number;
     hardBudgetCents: number;
     hardLatencyMsMax: number;
-    softPolicyHash: string;
     softPolicyText: string;
   },
   onState: (state: WriteLifecycleState, detail?: unknown) => void
 ) {
+  // rfq_hash and soft_policy_hash are computed on-chain by the contract
+  // from these exact texts - the frontend never sends a hash.
   return writeAndTrack(
     account,
     "create_rfq",
     [
-      params.rfqHash,
+      params.rfqSpecText,
       params.deadline,
       params.hardBudgetCents,
       params.hardLatencyMsMax,
-      params.softPolicyHash,
       params.softPolicyText,
     ],
     onState
@@ -201,23 +217,19 @@ export function submitBid(
   account: Address,
   params: {
     rfqId: number;
-    bidHash: string;
     priceCents: number;
     latencyMs: number;
     evidenceUrl: string;
   },
   onState: (state: WriteLifecycleState, detail?: unknown) => void
 ) {
+  // bid_hash is computed on-chain by the contract from
+  // rfq_id|seller|price_cents|latency_ms|evidence_url - the frontend never
+  // sends a hash.
   return writeAndTrack(
     account,
     "submit_bid",
-    [
-      params.rfqId,
-      params.bidHash,
-      params.priceCents,
-      params.latencyMs,
-      params.evidenceUrl,
-    ],
+    [params.rfqId, params.priceCents, params.latencyMs, params.evidenceUrl],
     onState
   );
 }
@@ -244,6 +256,16 @@ export function judgeAward(
   onState: (state: WriteLifecycleState, detail?: unknown) => void
 ) {
   return writeAndTrack(account, "judge_award", [rfqId], onState);
+}
+
+/** Re-runs judgment after NEEDS_CLARIFICATION over the exact same policy
+ * and bid set - no parameters beyond rfqId, so nothing can be rewritten. */
+export function retryJudgment(
+  account: Address,
+  rfqId: number,
+  onState: (state: WriteLifecycleState, detail?: unknown) => void
+) {
+  return writeAndTrack(account, "retry_judgment", [rfqId], onState);
 }
 
 export function acceptAward(

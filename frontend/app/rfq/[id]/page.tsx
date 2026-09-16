@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useWallet } from "@/lib/wallet-context";
-import { sha256Hex } from "@/lib/hash";
 import {
   readRfq,
   readBid,
@@ -12,6 +11,7 @@ import {
   closeBidding,
   filterHardConstraints,
   judgeAward,
+  retryJudgment,
   acceptAward,
   type RfqView,
   type BidView,
@@ -22,6 +22,15 @@ import { StateBadge } from "@/components/StateBadge";
 import { LifecycleTrack } from "@/components/LifecycleTrack";
 import { explorerTxUrl } from "@/lib/genlayer/chain";
 import { allowedActions } from "@/lib/lifecycle";
+
+const FINALITY_LABELS: Record<AwardReceiptView["finality_status"], string> = {
+  ACCEPTED_FINAL: "Accepted — final",
+  AWARDED_PENDING_ACCEPTANCE: "Awarded — pending buyer acceptance",
+  NEEDS_CLARIFICATION_PENDING_RETRY: "Needs clarification — pending retry",
+  NO_VALID_BID_FINAL: "No valid bid — final",
+  CANCELLED_FINAL: "Cancelled — final",
+  NOT_YET_AWARDED: "Not yet awarded",
+};
 
 export default function RfqDetailPage() {
   const params = useParams<{ id: string }>();
@@ -41,7 +50,6 @@ export default function RfqDetailPage() {
   const [bidPrice, setBidPrice] = useState("450.00");
   const [bidLatency, setBidLatency] = useState("250");
   const [bidEvidenceUrl, setBidEvidenceUrl] = useState("https://example.com/quorda-demo/bid.json");
-  const [bidSpec, setBidSpec] = useState("Refund: 30 days full refund. Support: 24/7 priority. Uptime: 99.95% documented.");
 
   const load = useCallback(async () => {
     setLoadError(null);
@@ -95,12 +103,10 @@ export default function RfqDetailPage() {
     setFailed(false);
     setState(null);
     try {
-      const bidHash = await sha256Hex(bidSpec);
       const { txHash } = await submitBid(
         address,
         {
           rfqId,
-          bidHash,
           priceCents: Math.round(parseFloat(bidPrice) * 100),
           latencyMs: parseInt(bidLatency, 10),
           evidenceUrl: bidEvidenceUrl,
@@ -132,6 +138,8 @@ export default function RfqDetailPage() {
     isCreator,
     bidCount: bids.length,
     accepted: rfq.accepted,
+    judgmentAttempts: rfq.judgment_attempts,
+    maxJudgmentAttempts: rfq.max_judgment_attempts,
   });
 
   return (
@@ -142,12 +150,17 @@ export default function RfqDetailPage() {
       </div>
 
       <div className="card">
-        <h3>Immutable criteria (hashed before judgment)</h3>
+        <h3>Immutable criteria (commitment computed on-chain)</h3>
         <p className="small"><strong>Hard budget:</strong> ${(rfq.hard_budget_cents / 100).toFixed(2)}</p>
         <p className="small"><strong>Hard latency ceiling:</strong> {rfq.hard_latency_ms_max}ms</p>
         <p className="small"><strong>Soft priorities (judged by GenLayer):</strong> {rfq.soft_policy_text}</p>
-        <p className="small dim">Policy hash: <span className="mono">{rfq.soft_policy_hash}</span></p>
-        <p className="small dim">RFQ spec hash: <span className="mono">{rfq.rfq_hash}</span></p>
+        <p className="small dim">
+          Policy hash (Keccak256 of the exact text above, computed by the contract):{" "}
+          <span className="mono">{rfq.soft_policy_hash}</span>
+        </p>
+        <p className="small dim">
+          RFQ spec hash: <span className="mono">{rfq.rfq_hash}</span>
+        </p>
         <p className="small dim">Creator: <span className="mono">{rfq.creator}</span></p>
       </div>
 
@@ -161,7 +174,7 @@ export default function RfqDetailPage() {
             </thead>
             <tbody>
               {bids.map((b) => (
-                <tr key={b.id} style={rfq.winning_bid_id === b.id ? { background: "#7fd1a512" } : undefined}>
+                <tr key={b.id} style={rfq.winning_bid_id === b.id ? { background: "var(--color-mint-wash)" } : undefined}>
                   <td className="mono">#{b.id}</td>
                   <td>${(b.price_cents / 100).toFixed(2)}</td>
                   <td>{b.latency_ms}ms</td>
@@ -196,10 +209,11 @@ export default function RfqDetailPage() {
               <label>Public evidence URL (support/refund/uptime docs)</label>
               <input value={bidEvidenceUrl} onChange={(e) => setBidEvidenceUrl(e.target.value)} />
             </div>
-            <div className="field">
-              <label>Bid detail (hashed, not stored raw on-chain)</label>
-              <textarea rows={2} value={bidSpec} onChange={(e) => setBidSpec(e.target.value)} />
-            </div>
+            <p className="dim small">
+              The bid commitment (bid_hash) is computed on-chain from this
+              RFQ, your address, price, latency and evidence URL - it is not
+              something you supply.
+            </p>
             <button className="btn" onClick={handleSubmitBid}>
               {address ? "Sign & submit bid" : "Connect wallet to bid"}
             </button>
@@ -229,6 +243,11 @@ export default function RfqDetailPage() {
               Request GenLayer judgment
             </button>
           )}
+          {actions.includes("retry_judgment") && (
+            <button className="btn" onClick={() => runAction((a, s) => retryJudgment(a, rfqId, s))}>
+              Retry judgment ({rfq.judgment_attempts}/{rfq.max_judgment_attempts} attempts used)
+            </button>
+          )}
           {actions.includes("accept_award") && (
             <button className="btn" onClick={() => runAction((a, s) => acceptAward(a, rfqId, rfq.winning_bid_id, s))}>
               Accept award
@@ -238,6 +257,11 @@ export default function RfqDetailPage() {
 
         {rfq.state === "OPEN" && !isCreator && address && (
           <p className="dim small">Only the RFQ creator ({rfq.creator.slice(0, 10)}…) can close bidding.</p>
+        )}
+        {rfq.state === "NEEDS_CLARIFICATION" && isCreator && rfq.judgment_attempts >= rfq.max_judgment_attempts && (
+          <p className="dim small">
+            Maximum judgment attempts ({rfq.max_judgment_attempts}) reached — this RFQ cannot be retried further.
+          </p>
         )}
 
         {state && <LifecycleTrack current={state} failed={failed} />}
@@ -253,10 +277,10 @@ export default function RfqDetailPage() {
         <div className="card">
           <h3>Award receipt</h3>
           <p className="small">
-            <strong>Finality:</strong>{" "}
-            {receipt.finality_status === "ACCEPTED_FINAL" ? "Accepted — final" : "Awarded — pending buyer acceptance"}
+            <strong>Finality:</strong> {FINALITY_LABELS[receipt.finality_status]}
           </p>
           <p className="small dim">Policy hash: <span className="mono">{receipt.policy_hash}</span></p>
+          <p className="small dim">Judgment attempts so far: {receipt.judgment_attempts}</p>
           <p className="small">Validator verdict (bounded JSON, not free-form prose):</p>
           <pre className="mono small" style={{ whiteSpace: "pre-wrap", background: "var(--bg-panel-2)", padding: 12, borderRadius: 8 }}>
             {receipt.verdict ? JSON.stringify(JSON.parse(receipt.verdict), null, 2) : "—"}
@@ -267,7 +291,7 @@ export default function RfqDetailPage() {
       {(rfq.state === "NEEDS_CLARIFICATION" || rfq.state === "NO_VALID_BID") && (
         <div className="callout warn">
           {rfq.state === "NEEDS_CLARIFICATION"
-            ? "Validator consensus could not reach a confident, evidence-backed decision (missing/contradictory evidence, or a material tie) and correctly refused to fabricate a winner."
+            ? "Validator consensus could not reach a confident, evidence-backed decision (missing/contradictory evidence, or a material tie) and correctly refused to fabricate a winner. The buyer can retry judgment over the same policy and bids once evidence sources may have become reachable — nothing about the RFQ can be rewritten on retry."
             : "Every bid violated a hard constraint before any GenLayer call happened — there was nothing left to judge."}
         </div>
       )}
