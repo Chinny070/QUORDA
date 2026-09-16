@@ -28,7 +28,7 @@ test run in this evidence used that exact override successfully.
 
 | Field | Value |
 | --- | --- |
-| Commit SHA | recorded in the commit that accompanies this file (see `git log -1`) |
+| Commit SHA | `3856c44` (full: `3856c449ea7f579e8f2022908153d65217300481`) — this deployment predates that commit by minutes; the deployed bytecode matches this commit's `contracts/quorda.py` exactly (no contract changes since) |
 | Deployed contract address | `0xED865416cb79Ea9C32e4d93a0F324533F635A3e4` |
 | Deployment transaction hash | `0xacd02c567408bc44c20bbb7ecd65b6a0d36382da0ace036d8d31d3487e768571` |
 | Deployment date (UTC) | 2026-09-16 |
