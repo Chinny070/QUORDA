@@ -37,13 +37,16 @@ Retry path (NEEDS_CLARIFICATION is not a dead end):
     winner drawn from the original surviving set) or stay/return to
     NEEDS_CLARIFICATION.
 
-Known limitation: this SDK release exposes no on-chain clock accessor
-(no verified block-timestamp API), so `deadline` is stored as buyer-declared
-metadata for display/receipt purposes and is NOT enforced as an on-chain
-invariant (bids are not rejected for arriving "after" it). `created_at` is a
-monotonic creation ordinal, not wall-clock time. This is a genuine, disclosed
-limitation of the current runtime, not an oversight.
+Deadline enforcement: `gl.message.datetime` (an ISO-8601 UTC timestamp
+string, fixed per-transaction and identical across all validators - verified
+live via a real consensus write) is used as the on-chain clock. `deadline`
+is stored as an ISO-8601 string and `submit_bid` rejects any bid whose
+`gl.message.datetime` is at or after it. `created_at` is a monotonic
+creation ordinal (RFQ id), not wall-clock time - it exists only for stable
+ordering, not for deadline logic.
 """
+
+import datetime as _datetime
 
 import genlayer as gl
 from genlayer.storage import allow as allow_storage
@@ -70,6 +73,15 @@ DECISION_NEEDS_CLARIFICATION = "NEEDS_CLARIFICATION"
 
 MAX_EVIDENCE_BYTES = 1500
 MAX_JUDGMENT_ATTEMPTS = 5
+
+
+def _parse_iso_datetime(value: str) -> _datetime.datetime:
+    """Parses an ISO-8601 UTC timestamp (accepts a trailing 'Z', as
+    gl.message.datetime and buyer-supplied deadlines both use)."""
+    normalized = value.strip()
+    if normalized.endswith("Z"):
+        normalized = normalized[:-1] + "+00:00"
+    return _datetime.datetime.fromisoformat(normalized)
 
 
 @allow_storage
@@ -111,7 +123,7 @@ class Rfq:
     creator: Address
     rfq_spec_text: str
     rfq_hash: str
-    deadline: u256
+    deadline: str
     hard_budget_cents: u256
     hard_latency_ms_max: u256
     soft_policy_hash: str
@@ -135,7 +147,7 @@ class Rfq:
         creator: Address,
         rfq_spec_text: str,
         rfq_hash: str,
-        deadline: u256,
+        deadline: str,
         hard_budget_cents: u256,
         hard_latency_ms_max: u256,
         soft_policy_hash: str,
@@ -198,7 +210,7 @@ class QuordaContract(gl.contract.Contract):
     def create_rfq(
         self,
         rfq_spec_text: str,
-        deadline: u256,
+        deadline: str,
         hard_budget_cents: u256,
         hard_latency_ms_max: u256,
         soft_policy_text: str,
@@ -211,6 +223,12 @@ class QuordaContract(gl.contract.Contract):
             raise gl.vm.UserError("MISSING_RFQ_SPEC_TEXT")
         if len(soft_policy_text) == 0:
             raise gl.vm.UserError("MISSING_SOFT_POLICY_TEXT")
+        try:
+            deadline_dt = _parse_iso_datetime(deadline)
+        except Exception:
+            raise gl.vm.UserError("INVALID_DEADLINE_FORMAT")
+        if deadline_dt <= _parse_iso_datetime(gl.message.datetime):
+            raise gl.vm.UserError("DEADLINE_MUST_BE_IN_FUTURE")
 
         rfq_id = self.next_rfq_id
         self.next_rfq_id = u256(rfq_id + 1)
@@ -260,6 +278,8 @@ class QuordaContract(gl.contract.Contract):
             raise gl.vm.UserError("BIDDING_NOT_OPEN")
         if price_cents == 0:
             raise gl.vm.UserError("INVALID_PRICE")
+        if _parse_iso_datetime(gl.message.datetime) >= _parse_iso_datetime(rfq.deadline):
+            raise gl.vm.UserError("RFQ_DEADLINE_PASSED")
 
         bid_id = self.next_bid_id
         self.next_bid_id = u256(bid_id + 1)
@@ -536,7 +556,7 @@ class QuordaContract(gl.contract.Contract):
             "creator": rfq.creator.as_hex,
             "rfq_spec_text": rfq.rfq_spec_text,
             "rfq_hash": rfq.rfq_hash,
-            "deadline": int(rfq.deadline),
+            "deadline": rfq.deadline,
             "hard_budget_cents": int(rfq.hard_budget_cents),
             "hard_latency_ms_max": int(rfq.hard_latency_ms_max),
             "soft_policy_hash": rfq.soft_policy_hash,

@@ -29,7 +29,7 @@ export interface RfqView {
   /** Computed on-chain by the contract from rfq_spec_text (Keccak256) -
    * never a caller-asserted value. */
   rfq_hash: string;
-  deadline: number;
+  deadline: string;
   hard_budget_cents: number;
   hard_latency_ms_max: number;
   /** Computed on-chain by the contract from soft_policy_text (Keccak256) -
@@ -190,7 +190,7 @@ export function createRfq(
   account: Address,
   params: {
     rfqSpecText: string;
-    deadline: number;
+    deadline: string;
     hardBudgetCents: number;
     hardLatencyMsMax: number;
     softPolicyText: string;

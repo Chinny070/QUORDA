@@ -45,7 +45,7 @@ export default function NewRfqPage() {
         address,
         {
           rfqSpecText: rfqSpec,
-          deadline: Math.floor(Date.now() / 1000) + 30 * 24 * 3600,
+          deadline: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(),
           hardBudgetCents: Math.round(parseFloat(budgetDollars) * 100),
           hardLatencyMsMax: parseInt(latencyMs, 10),
           softPolicyText: softPolicy,

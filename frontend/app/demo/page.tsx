@@ -103,7 +103,7 @@ export default function DemoPage() {
         address,
         {
           rfqSpecText: `${scenario.title} - ${scenario.description} (run ${Date.now()})`,
-          deadline: Math.floor(Date.now() / 1000) + 3600,
+          deadline: new Date(Date.now() + 3600 * 1000).toISOString(),
           hardBudgetCents: Math.round(scenario.budgetUsd * 100),
           hardLatencyMsMax: scenario.latencyMs,
           softPolicyText: SOFT_POLICY,

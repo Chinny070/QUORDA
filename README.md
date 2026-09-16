@@ -32,8 +32,9 @@ gltest.config.yaml             Network config, pinned to studio_devnet (61997)
 
 ## Live deployment
 
-Deployed to Studio Next at `0xED865416cb79Ea9C32e4d93a0F324533F635A3e4`
-(chain 61997). All four mandatory scenarios have been run live against it:
+Deployed to Studio Next at `0x7e65fA3ee7ccE080E5FD8E70A38fDa1dc795F0F5`
+(chain 61997). All four mandatory scenarios, plus deadline enforcement,
+have been run live against it:
 
 - **Clean pass** — real validator consensus AWARDED the bid with the
   strongest refund/support/uptime evidence, then the buyer accepted it to
@@ -44,6 +45,10 @@ Deployed to Studio Next at `0xED865416cb79Ea9C32e4d93a0F324533F635A3e4`
   returned `NEEDS_CLARIFICATION` instead of guessing.
 - **Retry / recovery** — `retry_judgment` re-ran real consensus a second
   time over the byte-identical policy and bid set, still fail-closed.
+- **Deadline enforcement** — a past deadline is rejected at `create_rfq`,
+  and a bid submitted after its RFQ's deadline elapses is rejected at
+  `submit_bid`, using `gl.message.datetime` as a verified, consensus-safe
+  on-chain clock.
 
 See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for full transaction evidence,
 verdict JSON, and the on-chain commitment/authorization/prompt-injection
@@ -87,7 +92,7 @@ OPEN -> BIDDING_CLOSED -> FILTERED -> UNDER_JUDGMENT -> AWARDED
 OPEN -> CANCELLED
 ```
 
-1. `create_rfq(rfq_spec_text, deadline, hard_budget_cents, hard_latency_ms_max, soft_policy_text)` — buyer posts hard constraints and soft priorities in full. `rfq_hash` and `soft_policy_hash` are **computed by the contract** (Keccak256 of the exact text stored) — there is no way to submit a hash unrelated to the actual policy.
+1. `create_rfq(rfq_spec_text, deadline, hard_budget_cents, hard_latency_ms_max, soft_policy_text)` — buyer posts hard constraints and soft priorities in full. `rfq_hash` and `soft_policy_hash` are **computed by the contract** (Keccak256 of the exact text stored) — there is no way to submit a hash unrelated to the actual policy. `deadline` is an ISO-8601 UTC string (e.g. `2026-10-01T00:00:00Z`); the contract rejects a deadline already in the past, using `gl.message.datetime` (a real, consensus-safe on-chain clock) as the time source.
 2. `submit_bid(rfq_id, price_cents, latency_ms, evidence_url)` — seller submits structured commercial fields and an evidence URL. `bid_hash` is **computed by the contract** from `rfq_id | seller | price_cents | latency_ms | evidence_url`, binding the commitment to every material term and the bidder's identity.
 3. `close_bidding` → `filter_hard_constraints` — **deterministic**, no LLM involved. A bid that violates a hard price/latency constraint is eliminated here and can never reach judgment.
 4. `judge_award` — the **only** entry point that touches GenLayer's non-deterministic path: an equivalence-principle (`prompt_comparative`) block fetches each surviving bid's public evidence and asks validators to converge on the same winning `bid_id`, or `NEEDS_CLARIFICATION` when evidence is missing/contradictory/tied. Evidence is explicitly framed to validators as untrusted, unverified claims — never instructions — with dedicated rules against prompt injection.
@@ -141,11 +146,6 @@ rather than claiming success immediately after submission.
 
 ## Known limitations (documented, not hidden)
 
-- This SDK release's contract-authoring surface exposes no verified
-  on-chain clock accessor, so an RFQ's `deadline` is buyer-declared metadata
-  for display/receipt purposes and is **not enforced** as a contract
-  invariant — a bid is never rejected for arriving "after" it. This is a
-  disclosed limitation of the current GenVM runtime, not an oversight.
 - The hackathon MVP uses public/synthetic bid evidence. Production privacy
   design (encrypted off-chain payloads + on-chain commitments) is documented
   but not implemented for the hackathon build — see the Master Compendium's

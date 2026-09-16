@@ -57,6 +57,8 @@ from gltest import get_contract_factory, get_accounts
 from gltest.assertions import tx_execution_failed
 
 
+FAR_FUTURE_DEADLINE = "2099-01-01T00:00:00Z"
+
 SOFT_POLICY_TEXT = (
     "Prefer the bid with the strongest refund terms, most comprehensive "
     "support coverage and best documented uptime. Delivery certainty "
@@ -123,9 +125,9 @@ def test_create_rfq_computes_hashes_on_chain(quorda_factory, accounts):
     buyer = accounts[0]
     contract = _deploy(quorda_factory, buyer)
 
-    w(contract.create_rfq(args=["Identical RFQ spec text.", 9999999999, 50000, 300, SOFT_POLICY_TEXT]))
+    w(contract.create_rfq(args=["Identical RFQ spec text.", FAR_FUTURE_DEADLINE, 50000, 300, SOFT_POLICY_TEXT]))
     rfq_id_a = _latest_rfq_id(contract)
-    w(contract.create_rfq(args=["Identical RFQ spec text.", 9999999999, 50000, 300, SOFT_POLICY_TEXT]))
+    w(contract.create_rfq(args=["Identical RFQ spec text.", FAR_FUTURE_DEADLINE, 50000, 300, SOFT_POLICY_TEXT]))
     rfq_id_b = _latest_rfq_id(contract)
 
     rfq_a = r(contract.get_rfq(args=[rfq_id_a]))
@@ -133,7 +135,7 @@ def test_create_rfq_computes_hashes_on_chain(quorda_factory, accounts):
     assert rfq_a["rfq_hash"] == rfq_b["rfq_hash"]
     assert rfq_a["soft_policy_hash"] == rfq_b["soft_policy_hash"]
 
-    w(contract.create_rfq(args=["Different RFQ spec text.", 9999999999, 50000, 300, SOFT_POLICY_TEXT]))
+    w(contract.create_rfq(args=["Different RFQ spec text.", FAR_FUTURE_DEADLINE, 50000, 300, SOFT_POLICY_TEXT]))
     different = _latest_rfq_id(contract)
     rfq_diff = r(contract.get_rfq(args=[different]))
     assert rfq_diff["rfq_hash"] != rfq_a["rfq_hash"]
@@ -142,7 +144,7 @@ def test_create_rfq_computes_hashes_on_chain(quorda_factory, accounts):
 def test_bid_hash_binds_material_terms(quorda_factory, accounts):
     buyer, seller = accounts[0], accounts[1]
     contract = _deploy(quorda_factory, buyer)
-    w(contract.create_rfq(args=["RFQ for bid hash test.", 9999999999, 50000, 300, SOFT_POLICY_TEXT]))
+    w(contract.create_rfq(args=["RFQ for bid hash test.", FAR_FUTURE_DEADLINE, 50000, 300, SOFT_POLICY_TEXT]))
     rfq_id = _latest_rfq_id(contract)
 
     seller_contract = contract.connect(seller)
@@ -166,7 +168,7 @@ def test_clean_pass_awards_best_tradeoff_bid(quorda_factory, accounts):
     w(contract.create_rfq(
         args=[
             "API provider for production workload; hard budget/latency below are non-negotiable.",
-            9999999999,
+            FAR_FUTURE_DEADLINE,
             50000,  # $500.00 hard budget
             300,  # 300ms hard latency ceiling
             SOFT_POLICY_TEXT,
@@ -215,7 +217,7 @@ def test_negative_case_hard_violation_never_reaches_judgment(quorda_factory, acc
     w(contract.create_rfq(
         args=[
             "RFQ with a tight hard budget/latency, intended to reject the only bid.",
-            9999999999,
+            FAR_FUTURE_DEADLINE,
             10000,  # $100.00 hard budget
             100,  # 100ms hard latency ceiling
             SOFT_POLICY_TEXT,
@@ -257,7 +259,7 @@ def test_uncertainty_case_missing_evidence_yields_needs_clarification(
     w(contract.create_rfq(
         args=[
             "RFQ where both bids point at unresolvable evidence.",
-            9999999999,
+            FAR_FUTURE_DEADLINE,
             50000,
             300,
             SOFT_POLICY_TEXT,
@@ -297,7 +299,7 @@ def test_retry_after_needs_clarification_preserves_policy_and_bids(
     contract = _deploy(quorda_factory, buyer)
 
     w(contract.create_rfq(
-        args=["RFQ used to exercise the retry path.", 9999999999, 50000, 300, SOFT_POLICY_TEXT]
+        args=["RFQ used to exercise the retry path.", FAR_FUTURE_DEADLINE, 50000, 300, SOFT_POLICY_TEXT]
     ))
     rfq_id = _latest_rfq_id(contract)
     w(contract.connect(seller_a).submit_bid(
@@ -336,7 +338,7 @@ def test_accept_award_requires_creator_and_awarded_state(quorda_factory, account
     contract = _deploy(quorda_factory, buyer)
 
     w(contract.create_rfq(
-        args=["RFQ used for accept_award authorization test.", 9999999999, 50000, 300, SOFT_POLICY_TEXT]
+        args=["RFQ used for accept_award authorization test.", FAR_FUTURE_DEADLINE, 50000, 300, SOFT_POLICY_TEXT]
     ))
     rfq_id = _latest_rfq_id(contract)
     w(contract.connect(seller_a).submit_bid(
@@ -370,7 +372,7 @@ def test_cannot_close_bidding_as_non_creator(quorda_factory, accounts):
     buyer, seller_a, attacker = accounts[0], accounts[1], accounts[2]
     contract = _deploy(quorda_factory, buyer)
     w(contract.create_rfq(
-        args=["RFQ used for close_bidding authorization test.", 9999999999, 50000, 300, SOFT_POLICY_TEXT]
+        args=["RFQ used for close_bidding authorization test.", FAR_FUTURE_DEADLINE, 50000, 300, SOFT_POLICY_TEXT]
     ))
     rfq_id = _latest_rfq_id(contract)
     w(contract.connect(seller_a).submit_bid(
@@ -387,7 +389,7 @@ def test_prompt_injection_evidence_does_not_override_rules(quorda_factory, accou
     contract = _deploy(quorda_factory, buyer)
 
     w(contract.create_rfq(
-        args=["RFQ used for prompt-injection resistance test.", 9999999999, 50000, 300, SOFT_POLICY_TEXT]
+        args=["RFQ used for prompt-injection resistance test.", FAR_FUTURE_DEADLINE, 50000, 300, SOFT_POLICY_TEXT]
     ))
     rfq_id = _latest_rfq_id(contract)
     w(contract.connect(seller_a).submit_bid(
@@ -404,3 +406,45 @@ def test_prompt_injection_evidence_does_not_override_rules(quorda_factory, accou
     # With no genuinely fetchable evidence, the only correct outcome is
     # NEEDS_CLARIFICATION - not a fabricated award for either bid.
     assert rfq["state"] == "NEEDS_CLARIFICATION"
+
+
+def test_deadline_is_enforced_on_chain(quorda_factory, accounts):
+    """create_rfq must reject a deadline that is already in the past, and
+    submit_bid must reject a bid submitted at/after the RFQ's deadline.
+    Uses gl.message.datetime (verified live to be a real, consensus-safe
+    ISO-8601 UTC clock) as the on-chain time source."""
+    buyer, seller_a = accounts[0], accounts[1]
+    contract = _deploy(quorda_factory, buyer)
+
+    # A deadline in the past must be rejected at creation time.
+    assert tx_execution_failed(w(contract.create_rfq(
+        args=["RFQ with a deadline already in the past.", "2020-01-01T00:00:00Z", 50000, 300, SOFT_POLICY_TEXT]
+    )))
+
+    # A deadline comfortably in the future (so create_rfq itself, which
+    # reads the same clock, is not rejected for arriving "late") is
+    # accepted, then a bid submitted well after it has since elapsed must
+    # be rejected. A single finalized write on this network has been
+    # observed taking anywhere from ~30s to ~90s, so the deadline is set
+    # generously ahead and then genuinely waited out rather than assumed.
+    import datetime as _dt
+    import time as _time
+
+    near_deadline = (
+        _dt.datetime.now(_dt.timezone.utc) + _dt.timedelta(seconds=90)
+    ).isoformat().replace("+00:00", "Z")
+    w(contract.create_rfq(
+        args=["RFQ with a near-future deadline.", near_deadline, 50000, 300, SOFT_POLICY_TEXT]
+    ))
+    rfq_ids = r(contract.list_rfq_ids())
+    assert len(rfq_ids) > 0, "create_rfq with a genuinely future deadline must succeed"
+    rfq_id = max(rfq_ids)
+
+    # Wait until the deadline has definitely elapsed.
+    while _dt.datetime.now(_dt.timezone.utc) < _dt.datetime.fromisoformat(near_deadline.replace("Z", "+00:00")):
+        _time.sleep(5)
+    _time.sleep(5)  # small safety margin past the deadline
+
+    assert tx_execution_failed(w(contract.connect(seller_a).submit_bid(
+        args=[rfq_id, 20000, 150, "https://example.com/quorda-demo/late-bid.json"]
+    )))
