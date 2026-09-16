@@ -28,7 +28,7 @@ test run in this evidence used that exact override successfully.
 
 | Field | Value |
 | --- | --- |
-| Commit SHA | recorded in the commit accompanying this file (`git log -1`) |
+| Commit SHA | `ba0a5e0` (full: `ba0a5e0a6788694cc180eef54e5a40da0ffa349e`) |
 | Deployed contract address | `0x7e65fA3ee7ccE080E5FD8E70A38fDa1dc795F0F5` |
 | Deployment transaction hash | `0x574433dcac31d8eff9fb67d24b34426ed9646fad2a54704828ca89bc2f95e9cd` |
 | Deployment date (UTC) | 2026-09-16 |
