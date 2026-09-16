@@ -4,6 +4,9 @@ export default function LandingPage() {
   return (
     <div>
       <section className="hero">
+        <span className="chip">
+          <span className="chip-tag">NEW</span> Live on Studio Next — chain 61997
+        </span>
         <h1>Neutral procurement clearing for autonomous buyers and sellers.</h1>
         <p>
           A buyer agent publishes an RFQ with hard constraints and soft priorities.
@@ -12,29 +15,34 @@ export default function LandingPage() {
           consensus is invoked only to judge the ambiguous part: which surviving
           bid best satisfies the buyer&apos;s declared trade-offs.
         </p>
-        <div style={{ display: "flex", gap: 12, marginTop: 20, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 12, marginTop: 28, flexWrap: "wrap", justifyContent: "center" }}>
           <Link href="/workspace" className="btn">Open workspace</Link>
           <Link href="/demo" className="btn secondary">Run demo scenarios</Link>
         </div>
       </section>
 
-      <div className="grid-2">
-        <div className="card">
-          <h3>What&apos;s deterministic</h3>
-          <p className="dim small">
-            Price ceilings and delivery-latency ceilings are hard numbers checked
-            in code, before any GenLayer call happens. A bid that violates a hard
-            constraint can never be awarded — no LLM ever evaluates it.
-          </p>
-        </div>
-        <div className="card">
-          <h3>What GenLayer judges</h3>
-          <p className="dim small">
-            Among bids that already pass the hard checks, which one best satisfies
-            heterogeneous, natural-language priorities — e.g. &quot;best support
-            coverage without sacrificing delivery certainty&quot; — against public
-            evidence every validator can independently inspect.
-          </p>
+      <div className="gradient-band">
+        <div className="gradient-band-inner">
+          <div className="feature-grid">
+            <div className="feature-card">
+              <div className="feature-icon">D</div>
+              <h3>What&apos;s deterministic</h3>
+              <p>
+                Price ceilings and delivery-latency ceilings are hard numbers checked
+                in code, before any GenLayer call happens. A bid that violates a hard
+                constraint can never be awarded — no LLM ever evaluates it.
+              </p>
+            </div>
+            <div className="feature-card">
+              <div className="feature-icon">G</div>
+              <h3>What GenLayer judges</h3>
+              <p>
+                Among bids that already pass the hard checks, which one best satisfies
+                heterogeneous, natural-language priorities against public evidence
+                every validator can independently inspect.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 

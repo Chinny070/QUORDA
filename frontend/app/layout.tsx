@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   title: "QUORDA — Neutral procurement clearing",
   description:
     "Neutral procurement clearing for autonomous buyers and sellers, adjudicated by GenLayer validator consensus.",
+  icons: { icon: "/logo.jpg" },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

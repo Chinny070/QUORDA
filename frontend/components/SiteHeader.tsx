@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useWallet } from "@/lib/wallet-context";
 
 function short(addr: string) {
@@ -13,8 +14,9 @@ export function SiteHeader() {
   return (
     <header className="header">
       <div className="brand">
-        <Link href="/" className="brand-name" style={{ color: "inherit" }}>
-          QUORDA
+        <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Image src="/logo.jpg" alt="QUORDA" width={30} height={30} className="brand-logo" />
+          <span className="brand-name">QUORDA</span>
         </Link>
         <span className="brand-tag">Studio Next · chain {chainId}</span>
       </div>
