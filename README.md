@@ -1,0 +1,135 @@
+# QUORDA
+
+Neutral procurement clearing for autonomous buyers and sellers.
+
+QUORDA is a neutral clearing layer where a buyer agent publishes an RFQ,
+seller agents submit complex offers, and **GenLayer validator consensus**
+decides which surviving bid best satisfies the buyer's declared trade-offs
+before an award is committed on-chain.
+
+QUORDA decides **who should win before a deal is formed**. It does not hold
+funds, run escrow, or govern whether a selected provider later delivers.
+
+## Why GenLayer
+
+Price ceilings and latency ceilings are deterministic — enforced entirely in
+Python, before any non-deterministic call happens. The GenLayer-native part
+is interpreting non-price priorities and heterogeneous terms — e.g. "best
+support coverage without sacrificing delivery certainty" — against public
+evidence every validator can independently inspect. See
+[contracts/quorda.py](contracts/quorda.py) for the exact boundary.
+
+## Repository layout
+
+```
+contracts/quorda.py            The canonical Intelligent Contract
+tests/direct/                  Pure-function unit tests (no network)
+tests/integration/             gltest suite against Studio Next (studio_devnet)
+frontend/                      Next.js + TypeScript app (genlayer-js, injected wallet)
+docs/DEPLOYMENT.md             Deployment evidence (address, tx hashes, explorer links)
+gltest.config.yaml             Network config, pinned to studio_devnet (61997)
+```
+
+## Live deployment
+
+Deployed to Studio Next at `0x46CFB7F63aAD30F858c3932195A8B90963deaBbf`
+(chain 61997). All three mandatory scenarios have been run live against it:
+
+- **Clean pass** — validator consensus AWARDED the bid with the strongest
+  refund/support/uptime evidence over a weaker competing bid, then the buyer
+  accepted it to `ACCEPTED_FINAL`.
+- **Negative case** — an over-budget bid was eliminated deterministically;
+  GenLayer was never invoked.
+- **Uncertainty case** — with content-free evidence, validators correctly
+  returned `NEEDS_CLARIFICATION` instead of guessing.
+
+Full transaction hashes, verdict JSON and reproduction commands are in
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
+## Network (hackathon non-negotiable)
+
+| | |
+| --- | --- |
+| Network | **Studio Next** |
+| Chain ID | **61997** |
+| RPC | `https://studio-next.genlayer.com/api` |
+| Explorer | `https://explorer-studio-dev.genlayer.com/` |
+
+This project targets Studio Next only. It does not deploy to Studionet
+(61999) or any other network.
+
+## Locked toolchain
+
+| Component | Version |
+| --- | --- |
+| GenLayer CLI | `0.40.0-rc.3` |
+| `genlayer-js` | `2.0.0-rc.1` |
+| `genlayer-py` | `0.19.0rc2` |
+| `genlayer-test` / `gltest` | `0.30.0rc2` |
+| `genvm-linter` | `0.11.1rc2` |
+| Contract dependency header | `py-genlayer:5jycge4q8k23462jtb0b9fyey1s9qz928sz2nbrd9mg4sxqg2qng` |
+
+## Contract lifecycle
+
+```
+OPEN -> BIDDING_CLOSED -> FILTERED -> UNDER_JUDGMENT -> AWARDED
+                                    -> NO_VALID_BID
+                                    -> NEEDS_CLARIFICATION
+OPEN -> CANCELLED
+```
+
+1. `create_rfq` — buyer posts hard constraints, soft priorities and an evidence policy; everything is hashed and displayed before judgment.
+2. `submit_bid` — seller agents submit structured commercial fields and an evidence URL.
+3. `close_bidding` → `filter_hard_constraints` — **deterministic**, no LLM involved. A bid that violates a hard price/latency constraint is eliminated here and can never reach judgment.
+4. `judge_award` — the **only** step that touches GenLayer's non-deterministic path: an equivalence-principle (`prompt_comparative`) block fetches each surviving bid's public evidence and asks validators to converge on the same winning `bid_id`, or `NEEDS_CLARIFICATION` when evidence is missing/contradictory or bids are materially tied.
+5. `accept_award` — buyer confirms; `get_award_receipt` exposes a portable receipt (policy hash, verdict, finality status) downstream systems can reference.
+
+## Running it
+
+### Lint + test the contract
+
+```bash
+genvm-lint check contracts/quorda.py --json
+pytest tests/direct/ -v
+gltest tests/integration/test_quorda_integration.py -v -s
+```
+
+### Deploy to Studio Next
+
+```bash
+genlayer network set studio-dev
+genlayer deploy --contract contracts/quorda.py
+```
+
+Record the resulting address and tx hash in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
+### Run the frontend
+
+```bash
+cd frontend
+cp .env.example .env   # set NEXT_PUBLIC_QUORDA_CONTRACT_ADDRESS
+npm install
+npm run dev
+```
+
+Connect an injected wallet (no private keys are ever collected by this app),
+open **Demo scenarios**, and run the clean/negative/uncertainty cases. Every
+write shows honest lifecycle states (estimating fees → wallet approval →
+submitted → pending consensus → decided → finalized) rather than claiming
+success immediately after submission.
+
+## Known limitations (documented, not hidden)
+
+- This SDK release's contract-authoring surface exposes no verified
+  on-chain clock accessor, so an RFQ's `deadline` is buyer-declared metadata
+  for display/receipt purposes and is not enforced as a contract invariant.
+- The hackathon MVP uses public/synthetic bid evidence. Production privacy
+  design (encrypted off-chain payloads + on-chain commitments) is documented
+  but not implemented for the hackathon build — see the Master Compendium's
+  privacy/security section.
+
+## Product boundary
+
+QUORDA decides who should win before a deal is formed. **PRAEST** governs
+whether an already-selected service provider later fulfilled its
+obligations — a separate, later-stage product.

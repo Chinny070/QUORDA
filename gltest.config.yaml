@@ -1,0 +1,18 @@
+# QUORDA gltest network configuration.
+#
+# Hackathon requirement: the Agent Tank submission MUST run against
+# Studio Next (chain 61997), gltest network name `studio_devnet`.
+# Do NOT point `default_network` at `studionet` (61999) or any other chain.
+
+default_network: studio_devnet
+contracts_dir: contracts
+artifacts_dir: artifacts
+environment: .env
+
+networks:
+  studio_devnet:
+    id: 61997
+    # gltest/genlayer-py ship a built-in `studio_devnet` chain definition;
+    # this url is set explicitly to pin it to the hackathon RPC even if the
+    # SDK's bundled default ever drifts.
+    url: https://studio-next.genlayer.com/api

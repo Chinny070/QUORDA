@@ -1,0 +1,9 @@
+node_modules/
+.next/
+frontend/.env
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+artifacts/
+.DS_Store
