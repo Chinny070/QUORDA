@@ -22,6 +22,7 @@ import { StateBadge } from "@/components/StateBadge";
 import { LifecycleTrack } from "@/components/LifecycleTrack";
 import { explorerTxUrl } from "@/lib/genlayer/chain";
 import { allowedActions } from "@/lib/lifecycle";
+import { friendlyErrorMessage, isLikelyNetworkError } from "@/lib/errors";
 
 const FINALITY_LABELS: Record<AwardReceiptView["finality_status"], string> = {
   ACCEPTED_FINAL: "Accepted — final",
@@ -45,6 +46,7 @@ export default function RfqDetailPage() {
   const [state, setState] = useState<WriteLifecycleState | null>(null);
   const [failed, setFailed] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [actionErrorIsNetwork, setActionErrorIsNetwork] = useState(false);
   const [lastTx, setLastTx] = useState<string | null>(null);
 
   const [bidPrice, setBidPrice] = useState("450.00");
@@ -82,6 +84,7 @@ export default function RfqDetailPage() {
       return;
     }
     setActionError(null);
+    setActionErrorIsNetwork(false);
     setFailed(false);
     setState(null);
     try {
@@ -90,7 +93,8 @@ export default function RfqDetailPage() {
       await load();
     } catch (e) {
       setFailed(true);
-      setActionError(e instanceof Error ? e.message : "Transaction failed.");
+      setActionErrorIsNetwork(isLikelyNetworkError(e));
+      setActionError(friendlyErrorMessage(e));
     }
   }
 
@@ -100,6 +104,7 @@ export default function RfqDetailPage() {
       return;
     }
     setActionError(null);
+    setActionErrorIsNetwork(false);
     setFailed(false);
     setState(null);
     try {
@@ -117,7 +122,8 @@ export default function RfqDetailPage() {
       await load();
     } catch (e) {
       setFailed(true);
-      setActionError(e instanceof Error ? e.message : "Transaction failed.");
+      setActionErrorIsNetwork(isLikelyNetworkError(e));
+      setActionError(friendlyErrorMessage(e));
     }
   }
 
@@ -265,7 +271,16 @@ export default function RfqDetailPage() {
         )}
 
         {state && <LifecycleTrack current={state} failed={failed} />}
-        {actionError && <p className="field-error small">{actionError}</p>}
+        {actionError && (
+          <div style={{ marginTop: 8 }}>
+            <p className="field-error small">{actionError}</p>
+            {actionErrorIsNetwork && (
+              <button className="btn secondary" onClick={() => window.location.reload()}>
+                Reload page
+              </button>
+            )}
+          </div>
+        )}
         {lastTx && (
           <p className="small dim">
             Last transaction: <a href={explorerTxUrl(lastTx)} target="_blank" rel="noreferrer" className="mono">{lastTx}</a>

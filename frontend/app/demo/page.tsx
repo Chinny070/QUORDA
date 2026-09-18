@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useWallet } from "@/lib/wallet-context";
 import { createRfq, submitBid, listRfqIds, type WriteLifecycleState } from "@/lib/genlayer/contract";
 import { LifecycleTrack } from "@/components/LifecycleTrack";
+import { friendlyErrorMessage, isLikelyNetworkError } from "@/lib/errors";
 
 const SOFT_POLICY =
   "Prefer the bid with the strongest refund terms, most comprehensive support " +
@@ -97,6 +98,7 @@ export default function DemoPage() {
     setError(null);
     setLog([]);
     setCreatedRfqId(null);
+    let newRfqId: number | null = null;
     try {
       setLog((l) => [...l, "Creating RFQ (wallet signature required)…"]);
       const created = await createRfq(
@@ -116,7 +118,7 @@ export default function DemoPage() {
       // list_rfq_ids is monotonically increasing; the freshly created RFQ is
       // the highest id visible right after finalization.
       const ids = await listRfqIds();
-      const newRfqId = Math.max(...ids);
+      newRfqId = Math.max(...ids);
       setCreatedRfqId(newRfqId);
       setLog((l) => [...l, `New RFQ id: #${newRfqId}`]);
 
@@ -139,7 +141,13 @@ export default function DemoPage() {
         `All bids submitted to RFQ #${newRfqId}. Open it to continue: close bidding → filter → judge → accept.`,
       ]);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Scenario run failed.");
+      if (isLikelyNetworkError(e) && newRfqId !== null) {
+        setLog((l) => [
+          ...l,
+          `Lost connection to Studio Next partway through. RFQ #${newRfqId} was already created — open it below and check which bids landed before continuing manually.`,
+        ]);
+      }
+      setError(friendlyErrorMessage(e));
     } finally {
       setRunning(null);
     }

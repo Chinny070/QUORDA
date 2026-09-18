@@ -6,6 +6,7 @@ import { useWallet } from "@/lib/wallet-context";
 import { createRfq, type WriteLifecycleState } from "@/lib/genlayer/contract";
 import { LifecycleTrack } from "@/components/LifecycleTrack";
 import { explorerTxUrl } from "@/lib/genlayer/chain";
+import { friendlyErrorMessage, isLikelyNetworkError } from "@/lib/errors";
 
 export default function NewRfqPage() {
   const { address, connect } = useWallet();
@@ -30,6 +31,7 @@ export default function NewRfqPage() {
   const [state, setState] = useState<WriteLifecycleState | null>(null);
   const [failed, setFailed] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorIsNetwork, setErrorIsNetwork] = useState(false);
   const [txHash, setTxHash] = useState<string | null>(null);
 
   async function handleSubmit() {
@@ -38,6 +40,7 @@ export default function NewRfqPage() {
       return;
     }
     setError(null);
+    setErrorIsNetwork(false);
     setFailed(false);
     setState(null);
     try {
@@ -55,7 +58,8 @@ export default function NewRfqPage() {
       setTxHash(txHash);
     } catch (e) {
       setFailed(true);
-      setError(e instanceof Error ? e.message : "Transaction failed.");
+      setErrorIsNetwork(isLikelyNetworkError(e));
+      setError(friendlyErrorMessage(e));
     }
   }
 
@@ -117,7 +121,16 @@ export default function NewRfqPage() {
           <p className="small dim">RFQ spec: {rfqSpec}</p>
 
           {state && <LifecycleTrack current={state} failed={failed} />}
-          {error && <p className="field-error small">{error}</p>}
+          {error && (
+            <div style={{ marginBottom: 8 }}>
+              <p className="field-error small">{error}</p>
+              {errorIsNetwork && (
+                <button className="btn secondary" onClick={() => window.location.reload()}>
+                  Reload page
+                </button>
+              )}
+            </div>
+          )}
 
           <div style={{ display: "flex", gap: 10 }}>
             <button className="btn secondary" onClick={() => setReviewed(false)} disabled={!!state && !failed}>
