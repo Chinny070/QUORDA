@@ -1,0 +1,8 @@
+{
+  "vendor": "CoreHost API Services",
+  "support": "Business-hours-only email support (9am-5pm weekdays), typical response time 24-48 hours, no phone or chat support",
+  "refund_policy": "Refunds only for annual plans, prorated at 50% after the first 30 days, no refund on monthly plans",
+  "uptime_last_12_months": "99.5%",
+  "uptime_documentation": "No public status page; uptime figures self-reported in a quarterly PDF summary emailed to customers on request",
+  "notes": "No SLA credit program; outages compensated case-by-case at vendor discretion"
+}
