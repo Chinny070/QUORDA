@@ -1,43 +1,52 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { listRfqIds, readRfq, type RfqView } from "@/lib/genlayer/contract";
 import { StateBadge } from "@/components/StateBadge";
 import { useWallet } from "@/lib/wallet-context";
+import { friendlyErrorMessage, isLikelyRateLimitError } from "@/lib/errors";
+
+// Studio Next permits a limited number of RPC reads per minute. Loading every
+// historical RFQ in parallel makes the workspace unusable once a demo account
+// has created a number of RFQs, so the landing view deliberately loads only
+// the newest entries and keeps the calls sequential.
+const WORKSPACE_RFQ_LIMIT = 12;
 
 export default function WorkspacePage() {
   const { address } = useWallet();
   const [rfqs, setRfqs] = useState<RfqView[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [rateLimited, setRateLimited] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [totalRfqCount, setTotalRfqCount] = useState<number | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
+  const load = useCallback(async () => {
       setLoading(true);
       setError(null);
+      setRateLimited(false);
       try {
         const ids = await listRfqIds();
-        const items = await Promise.all(ids.map((id) => readRfq(id)));
-        if (!cancelled) setRfqs(items.sort((a, b) => b.id - a.id));
-      } catch (e) {
-        if (!cancelled) {
-          setError(
-            e instanceof Error
-              ? e.message
-              : "Failed to load RFQs from the deployed contract."
-          );
+        setTotalRfqCount(ids.length);
+        const latestIds = [...ids]
+          .sort((a, b) => b - a)
+          .slice(0, WORKSPACE_RFQ_LIMIT);
+        const items: RfqView[] = [];
+        for (const id of latestIds) {
+          items.push(await readRfq(id));
         }
+        setRfqs(items);
+      } catch (e) {
+        setRateLimited(isLikelyRateLimitError(e));
+        setError(friendlyErrorMessage(e));
       } finally {
-        if (!cancelled) setLoading(false);
+        setLoading(false);
       }
-    }
-    load();
-    return () => {
-      cancelled = true;
-    };
   }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   return (
     <div>
@@ -54,9 +63,23 @@ export default function WorkspacePage() {
       )}
 
       <div className="card">
-        <h3>All RFQs (on-chain state)</h3>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+          <h3 style={{ margin: 0 }}>Latest RFQs (on-chain state)</h3>
+          <button className="btn secondary" onClick={() => void load()} disabled={loading}>
+            {loading ? "Loading…" : "Refresh"}
+          </button>
+        </div>
+        {totalRfqCount !== null && totalRfqCount > WORKSPACE_RFQ_LIMIT && (
+          <p className="dim small">Showing the newest {WORKSPACE_RFQ_LIMIT} of {totalRfqCount} RFQs.</p>
+        )}
         {loading && <p className="dim small">Loading from Studio Next…</p>}
-        {error && <p className="field-error small">{error}</p>}
+        {error && (
+          <div style={{ marginTop: 10 }}>
+            <p className="field-error small">{error}</p>
+            {rateLimited && <p className="dim small">The retry is read-only; it will not create or change anything.</p>}
+            <button className="btn secondary" onClick={() => void load()}>Retry</button>
+          </div>
+        )}
         {!loading && !error && rfqs && rfqs.length === 0 && (
           <p className="dim small">No RFQs yet. Create one to get started.</p>
         )}

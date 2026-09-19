@@ -29,12 +29,31 @@ const NETWORK_ERROR_PATTERNS = [
   "timeout",
 ];
 
+const RATE_LIMIT_PATTERNS = [
+  "rate limit",
+  "too many requests",
+  "429",
+  "30 requests per minute",
+];
+
 export function isLikelyNetworkError(error: unknown): boolean {
   const text = errorText(error).toLowerCase();
   return NETWORK_ERROR_PATTERNS.some((p) => text.includes(p));
 }
 
+export function isLikelyRateLimitError(error: unknown): boolean {
+  const text = errorText(error).toLowerCase();
+  return RATE_LIMIT_PATTERNS.some((p) => text.includes(p));
+}
+
 export function friendlyErrorMessage(error: unknown): string {
+  if (isLikelyRateLimitError(error)) {
+    return (
+      "Studio Next is temporarily rate-limiting read requests. No transaction " +
+      "has failed. Wait a few seconds, then use Retry to refresh the latest " +
+      "on-chain RFQs."
+    );
+  }
   if (isLikelyNetworkError(error)) {
     return (
       "Lost connection to Studio Next while waiting on this transaction. " +
