@@ -82,12 +82,9 @@ export default function NewRfqPage() {
     <div>
       <h1>Create RFQ</h1>
       <p className="dim small">
-        Hard constraints below are enforced deterministically by the contract
-        before any GenLayer judgment runs. Soft priorities are natural language
-        that GenLayer validators interpret against each surviving bid&apos;s evidence.
-        The RFQ spec hash and policy hash are computed on-chain by the
-        contract from the exact text you submit — they are not values you
-        supply, so they can never point at unrelated content.
+        Set the non-negotiables first, then describe what matters most when two
+        offers qualify. QUORDA automatically locks the exact wording you submit
+        so no one can quietly change the criteria after offers arrive.
       </p>
 
       {!reviewed ? (
@@ -107,7 +104,7 @@ export default function NewRfqPage() {
             </div>
           </div>
           <div className="field">
-            <label htmlFor="policy">Soft priorities (natural language, judged by GenLayer)</label>
+            <label htmlFor="policy">How should qualifying offers be compared?</label>
             <textarea id="policy" rows={4} value={softPolicy} onChange={(e) => setSoftPolicy(e.target.value)} />
           </div>
           <button className="btn" onClick={() => setReviewed(true)}>Review before submitting →</button>

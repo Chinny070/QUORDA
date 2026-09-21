@@ -7,13 +7,12 @@ export default function LandingPage() {
         <span className="chip">
           <span className="chip-tag">NEW</span> Live on Studio Next — chain 61997
         </span>
-        <h1>Neutral procurement clearing for autonomous buyers and sellers.</h1>
+        <h1>Choose the right supplier with a decision you can verify.</h1>
         <p>
-          A buyer agent publishes an RFQ with hard constraints and soft priorities.
-          Seller agents submit structured bids with public evidence. Deterministic
-          code eliminates any bid that violates a hard rule — GenLayer validator
-          consensus is invoked only to judge the ambiguous part: which surviving
-          bid best satisfies the buyer&apos;s declared trade-offs.
+          Buyers set their non-negotiables and priorities. Suppliers submit offers
+          with public support. QUORDA removes offers that fail the hard rules, then
+          GenLayer validators decide which remaining offer best matches the buyer&apos;s
+          priorities—or refuse to guess when the evidence is not good enough.
         </p>
         <div style={{ display: "flex", gap: 12, marginTop: 28, flexWrap: "wrap", justifyContent: "center" }}>
           <Link href="/workspace" className="btn">Open workspace</Link>

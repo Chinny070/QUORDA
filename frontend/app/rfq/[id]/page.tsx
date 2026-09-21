@@ -23,6 +23,7 @@ import { LifecycleTrack } from "@/components/LifecycleTrack";
 import { explorerTxUrl } from "@/lib/genlayer/chain";
 import { allowedActions } from "@/lib/lifecycle";
 import { friendlyErrorMessage, isLikelyNetworkError } from "@/lib/errors";
+import { parseVerdict } from "@/lib/verdict";
 
 const FINALITY_LABELS: Record<AwardReceiptView["finality_status"], string> = {
   ACCEPTED_FINAL: "Accepted — final",
@@ -147,6 +148,10 @@ export default function RfqDetailPage() {
     judgmentAttempts: rfq.judgment_attempts,
     maxJudgmentAttempts: rfq.max_judgment_attempts,
   });
+  const verdict = receipt?.verdict ? parseVerdict(receipt.verdict) : null;
+  const citedBids = verdict
+    ? bids.filter((bid) => verdict.evidenceRefs.includes(String(bid.id)))
+    : [];
 
   return (
     <div>
@@ -156,18 +161,17 @@ export default function RfqDetailPage() {
       </div>
 
       <div className="card">
-        <h3>Immutable criteria (commitment computed on-chain)</h3>
+        <h3>What the buyer needs</h3>
         <p className="small"><strong>Hard budget:</strong> ${(rfq.hard_budget_cents / 100).toFixed(2)}</p>
         <p className="small"><strong>Hard latency ceiling:</strong> {rfq.hard_latency_ms_max}ms</p>
-        <p className="small"><strong>Soft priorities (judged by GenLayer):</strong> {rfq.soft_policy_text}</p>
-        <p className="small dim">
-          Policy hash (Keccak256 of the exact text above, computed by the contract):{" "}
-          <span className="mono">{rfq.soft_policy_hash}</span>
-        </p>
-        <p className="small dim">
-          RFQ spec hash: <span className="mono">{rfq.rfq_hash}</span>
-        </p>
-        <p className="small dim">Creator: <span className="mono">{rfq.creator}</span></p>
+        <p className="small"><strong>How to choose among qualifying offers:</strong> {rfq.soft_policy_text}</p>
+        <details className="verification-details">
+          <summary>Technical verification details</summary>
+          <p className="small dim">The contract locked the exact criteria shown above when this RFQ was created. These are public fingerprints anyone can use to verify they have not changed.</p>
+          <p className="small dim">Policy fingerprint: <span className="mono">{rfq.soft_policy_hash}</span></p>
+          <p className="small dim">RFQ fingerprint: <span className="mono">{rfq.rfq_hash}</span></p>
+          <p className="small dim">Buyer wallet: <span className="mono">{rfq.creator}</span></p>
+        </details>
       </div>
 
       <div className="card">
@@ -176,15 +180,16 @@ export default function RfqDetailPage() {
         {bids.length > 0 && (
           <table>
             <thead>
-              <tr><th>ID</th><th>Price</th><th>Latency</th><th>Seller</th><th>Status</th></tr>
+              <tr><th>Offer</th><th>Price</th><th>Latency</th><th>Seller</th><th>Public support</th><th>Status</th></tr>
             </thead>
             <tbody>
               {bids.map((b) => (
                 <tr key={b.id} style={rfq.winning_bid_id === b.id ? { background: "var(--color-mint-wash)" } : undefined}>
-                  <td className="mono">#{b.id}</td>
+                  <td>Bid #{b.id}</td>
                   <td>${(b.price_cents / 100).toFixed(2)}</td>
                   <td>{b.latency_ms}ms</td>
                   <td className="mono">{b.seller.slice(0, 10)}…</td>
+                  <td><a href={b.evidence_url} target="_blank" rel="noreferrer">View source ↗</a></td>
                   <td>
                     {rfq.winning_bid_id === b.id
                       ? "🏆 Winner"
@@ -215,11 +220,7 @@ export default function RfqDetailPage() {
               <label>Public evidence URL (support/refund/uptime docs)</label>
               <input value={bidEvidenceUrl} onChange={(e) => setBidEvidenceUrl(e.target.value)} />
             </div>
-            <p className="dim small">
-              The bid commitment (bid_hash) is computed on-chain from this
-              RFQ, your address, price, latency and evidence URL - it is not
-              something you supply.
-            </p>
+            <p className="dim small">Your offer is permanently tied to this RFQ, your wallet, price, latency and source link when you submit. QUORDA never asks you to create a technical hash.</p>
             <button className="btn" onClick={handleSubmitBid}>
               {address ? "Sign & submit bid" : "Connect wallet to bid"}
             </button>
@@ -256,7 +257,7 @@ export default function RfqDetailPage() {
           )}
           {actions.includes("accept_award") && (
             <button className="btn" onClick={() => runAction((a, s) => acceptAward(a, rfqId, rfq.winning_bid_id, s))}>
-              Accept award
+              Confirm selected offer
             </button>
           )}
         </div>
@@ -290,16 +291,49 @@ export default function RfqDetailPage() {
 
       {receipt && (
         <div className="card">
-          <h3>Award receipt</h3>
+          <h3>Decision receipt</h3>
           <p className="small">
-            <strong>Finality:</strong> {FINALITY_LABELS[receipt.finality_status]}
+            <strong>Decision status:</strong> {FINALITY_LABELS[receipt.finality_status]}
           </p>
-          <p className="small dim">Policy hash: <span className="mono">{receipt.policy_hash}</span></p>
-          <p className="small dim">Judgment attempts so far: {receipt.judgment_attempts}</p>
-          <p className="small">Validator verdict (bounded JSON, not free-form prose):</p>
-          <pre className="mono small" style={{ whiteSpace: "pre-wrap", background: "var(--bg-panel-2)", padding: 12, borderRadius: 8 }}>
-            {receipt.verdict ? JSON.stringify(JSON.parse(receipt.verdict), null, 2) : "—"}
-          </pre>
+          {rfq.winning_bid_id > 0 && <p className="small"><strong>Selected offer:</strong> Bid #{rfq.winning_bid_id}</p>}
+          {verdict ? (
+            <>
+              <p className="small"><strong>Consensus confidence:</strong> {verdict.confidenceBand}</p>
+              <div className="receipt-section">
+                <strong>What the validators found</strong>
+                {verdict.findings.length > 0 ? <ul>{verdict.findings.map((finding, index) => <li key={index}>{finding}</li>)}</ul> : <p className="dim small">No additional findings were recorded.</p>}
+              </div>
+              <div className="receipt-section">
+                <strong>Sources considered</strong>
+                {citedBids.length > 0 ? (
+                  <ul>{citedBids.map((bid) => <li key={bid.id}>Bid #{bid.id}: <a href={bid.evidence_url} target="_blank" rel="noreferrer">open public source ↗</a></li>)}</ul>
+                ) : <p className="dim small">No source was relied upon for this outcome.</p>}
+                <p className="dim small">Sources are public seller-supplied claims, not facts guaranteed by QUORDA.</p>
+              </div>
+              {verdict.questions.length > 0 && (
+                <div className="receipt-section"><strong>Still unresolved</strong><ul>{verdict.questions.map((question, index) => <li key={index}>{question}</li>)}</ul></div>
+              )}
+            </>
+          ) : <p className="dim small">The contract recorded no readable verdict details for this receipt.</p>}
+          <details className="verification-details">
+            <summary>Technical verification details</summary>
+            <p className="small dim">Policy fingerprint: <span className="mono">{receipt.policy_hash}</span></p>
+            <p className="small dim">Judgment attempts: {receipt.judgment_attempts}</p>
+            <p className="small dim">Raw contract verdict:</p>
+            <pre className="mono small" style={{ whiteSpace: "pre-wrap", background: "var(--bg-panel-2)", padding: 12, borderRadius: 8 }}>{receipt.verdict || "—"}</pre>
+          </details>
+        </div>
+      )}
+
+      {rfq.state === "AWARDED" && (
+        <div className="callout">
+          <strong>What happens next:</strong> the buyer can confirm the selected offer above. QUORDA records the decision and acceptance; the purchase agreement, payment and delivery happen directly between buyer and seller outside this app.
+        </div>
+      )}
+
+      {rfq.accepted && (
+        <div className="callout">
+          <strong>Decision accepted.</strong> The buyer&apos;s acceptance is recorded on-chain. Share this receipt with the selected seller to begin the off-chain purchase or service agreement.
         </div>
       )}
 
