@@ -155,6 +155,39 @@ RFQ #6 and reputation RFQ #5 were verified on-chain; their UI pages were not
 separately inspected. No wallet was connected in the in-app browser, so
 write-signing and the actual wallet approval UI remain unverified.
 
+## Fresh verification on 2026-10-12
+
+After confirming `eth_chainId` returned `0xf22d` (61997), the pinned local
+toolchain was used for another pass. With `GENVM_VERSION=v0.6.0-rc6`,
+`genvm-lint check contracts/quorda.py --json` returned `ok: true` (18 methods,
+5 views, 13 writes). Direct tests passed 18/18; frontend tests passed 21/21;
+the production build passed.
+
+The 14-case Studio Next integration suite was re-exercised in targeted runs.
+The commitment, clean consensus, uncertainty, clarification retry,
+authorization, prompt-injection, deadline, and receipt cases passed. A
+hard-rejection test assertion was corrected: `judge_award` is expected to
+revert after filtering leaves `NO_VALID_BID`, so it must use the expected-failure
+helper. That corrected case passed. The integration fixture now retries
+transient failures only for idempotent RPC reads, including `eth_estimateGas`
+and `eth_getTransactionCount`; it never automatically resubmits
+`eth_sendRawTransaction`.
+
+The reputation/options, sealed-bid, and appeal revalidation attempts did not
+complete: Studio Next reset or timed out the HTTPS connection during write
+submission. Those attempts returned no transaction hash, so this latest
+revalidation is not a clean full-suite pass and no receipt can be attributed to
+those individual attempts. Latest/pending nonce queries showed no pending
+transactions at the time checked. Their successful final-address live evidence
+remains the RFQ #5, #6, and #7 evidence recorded above; the failures here are
+test-network transport failures, not contrary on-chain verdicts.
+
+The current Chrome session was not available to the browser automation bridge,
+and the Windows browser window could not be activated. Therefore the injected
+wallet signing lifecycle and an actual receipt-JSON download/re-import remain
+unverified. No wallet prompt was approved or transaction signed through
+Rabby.
+
 Final-address reputation, sealed-bid, and appeal transaction evidence:
 
 | RFQ | Action | Transaction / result |

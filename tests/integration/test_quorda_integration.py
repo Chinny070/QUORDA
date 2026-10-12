@@ -130,7 +130,9 @@ def retry_transient_read_rpc_errors():
     safe_reads = {
         "eth_call",
         "eth_chainId",
+        "eth_estimateGas",
         "eth_getBlockByNumber",
+        "eth_getTransactionCount",
         "eth_getTransactionByHash",
         "eth_getTransactionReceipt",
         "gen_getTransaction",
@@ -310,7 +312,7 @@ def test_negative_case_hard_violation_never_reaches_judgment(quorda_factory, acc
     assert bid["elimination_reason"] == "EXCEEDS_HARD_BUDGET"
 
     # judge_award must refuse to run judgment over zero surviving bids.
-    w(contract.judge_award(args=[rfq_id]))
+    wf(contract.judge_award(args=[rfq_id]))
     rfq_after = r(contract.get_rfq(args=[rfq_id]))
     assert rfq_after["state"] == "NO_VALID_BID"
     assert rfq_after["winning_bid_id"] == 0
