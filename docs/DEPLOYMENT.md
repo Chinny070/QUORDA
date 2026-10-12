@@ -45,13 +45,14 @@ frontend and gltest config use the hackathon RPC hostname above.
 | --- | --- |
 | GenVM lint and semantic validation | Pass: `ok: true`, 18 methods (13 writes, 5 views) |
 | Direct contract tests | Pass: 18 |
-| Frontend unit tests | Pass: 19 across 4 files |
+| Frontend unit tests | Pass: 21 across 5 files |
 | Frontend production build | Pass |
 | Live evidence receipt + consensus test | Pass: 1 test, genuine weighted-criteria judgment on Studio Next |
 | Clarification retry + single appeal | Pass: 2 tests, including repeated consensus, immutable policy/bids, and appeal authorization |
 | Sealed commit/reveal | Pass: 1 test, hidden terms, correct commitment preimage, timing and reveal |
 | Reputation floor | Pass: 1 test, accepted-win snapshot and deterministic filtering |
-| Agent API/SDK | Pass: included in 19 frontend unit tests; chain-61997 guard, sealed commitment preimage, fee-aware write lifecycle; no private-key or backend path |
+| Agent API/SDK | Pass: included in 21 frontend unit tests; chain-61997 guard, sealed commitment preimage, fee-aware write lifecycle; no private-key or backend path |
+| Receipt export serialization | Pass: 2 focused tests verify Studio Next metadata, contract-read payload, parsed verdict, observed transaction references, and filename. Browser-triggered file download remains unverified. |
 | Final-address `NO_VALID_BID` + `NEEDS_CLARIFICATION` retry | Pass: RFQs #3 and #4; retry held winner at zero and preserved RFQ/policy/constraints/bid IDs |
 | Final-address reputation floor | Pass: RFQ #5; seller A (0 accepted wins) eliminated, seller B (1) survived; after acceptance seller B had 2 accepted wins |
 | Final-address sealed commit/reveal | Pass: RFQ #6; hidden terms, open submission and early close rejected, exact commitment revealed after deadline |

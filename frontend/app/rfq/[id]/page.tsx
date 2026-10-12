@@ -30,6 +30,7 @@ import { allowedActions } from "@/lib/lifecycle";
 import { friendlyErrorMessage, isLikelyNetworkError } from "@/lib/errors";
 import { parseJudgmentHistory, parseVerdict } from "@/lib/verdict";
 import { createSealedBidSecret, type BidTerms } from "@/lib/agent-sdk";
+import { awardReceiptFilename, createPortableAwardReceipt } from "@/lib/receipt-export";
 import { QUORDA_CONTRACT_ADDRESS } from "@/lib/genlayer/contract";
 
 const FINALITY_LABELS: Record<AwardReceiptView["finality_status"], string> = {
@@ -295,24 +296,21 @@ export default function RfqDetailPage() {
     const transactionKey = `quorda:transactions:${QUORDA_CONTRACT_ADDRESS.toLowerCase()}:${rfqId}`;
     let transactionHashes: { action: string; hash: string }[] = [];
     try { transactionHashes = JSON.parse(window.localStorage.getItem(transactionKey) || "[]"); } catch { /* optional browser-local tx index */ }
-    const portableReceipt = {
-      format: "quorda-verifiable-award-receipt-v1",
-      network: { name: "GenLayer Studio Next", chainId: 61997, rpc: "https://studio-next.genlayer.com/api", explorer: "https://explorer-studio-dev.genlayer.com/" },
-      contractAddress: QUORDA_CONTRACT_ADDRESS,
-      exportedAt: new Date().toISOString(),
+    const portableReceipt = createPortableAwardReceipt({
       rfq,
       bids,
-      decisionReceipt: { ...receipt, parsedVerdict: verdict },
-      transactionHashesObservedInThisBrowser: transactionHashes,
-      verification: "RFQ and bid fields are read from the deployed contract. Verify the contract address and chain 61997, then compare these values with get_rfq, get_bid, and get_award_receipt. Evidence fingerprints commit to the content returned at judgment time; they do not guarantee a source's truth or availability.",
-    };
+      receipt,
+      parsedVerdict: verdict,
+      contractAddress: QUORDA_CONTRACT_ADDRESS,
+      transactionHashes,
+    });
     const blob = new Blob([JSON.stringify(portableReceipt, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `quorda-rfq-${rfqId}-award-receipt.json`;
+    link.download = awardReceiptFilename(rfqId);
     link.click();
-    URL.revokeObjectURL(url);
+    window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
     setExportMessage("Receipt JSON downloaded. The transaction list reflects only transactions observed in this browser.");
   }
 
