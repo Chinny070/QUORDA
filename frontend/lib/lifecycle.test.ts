@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { allowedActions } from "./lifecycle";
 
-const base = { judgmentAttempts: 0, maxJudgmentAttempts: 5 };
+const base = { judgmentAttempts: 0, maxJudgmentAttempts: 5, hasLosingBid: false, appealUsed: false, sealedBids: false, revealDeadline: "", nowMs: Date.now() };
 
 describe("allowedActions", () => {
   it("offers nothing to a non-creator", () => {
@@ -20,6 +20,10 @@ describe("allowedActions", () => {
     expect(
       allowedActions({ state: "OPEN", isCreator: true, bidCount: 1, accepted: false, ...base })
     ).toEqual(["close_bidding"]);
+  });
+
+  it("waits until the sealed reveal deadline before offering close bidding", () => {
+    expect(allowedActions({ ...base, state: "OPEN", isCreator: true, bidCount: 1, accepted: false, sealedBids: true, revealDeadline: "2099-01-01T00:00:00Z", nowMs: Date.now() })).toEqual([]);
   });
 
   it("offers filter_hard_constraints after bidding closes", () => {
@@ -43,9 +47,16 @@ describe("allowedActions", () => {
     ).toEqual([]);
   });
 
+  it("allows a losing seller to appeal once and the buyer to resolve it", () => {
+    expect(allowedActions({ ...base, state: "AWARDED", isCreator: false, bidCount: 2, accepted: false, hasLosingBid: true, appealUsed: false })).toEqual(["open_appeal"]);
+    expect(allowedActions({ ...base, state: "AWARDED", isCreator: false, bidCount: 2, accepted: false, hasLosingBid: true, appealUsed: true })).toEqual([]);
+    expect(allowedActions({ state: "APPEAL_PENDING", isCreator: true, bidCount: 2, accepted: false, ...base })).toEqual(["resolve_appeal"]);
+  });
+
   it("offers retry_judgment after NEEDS_CLARIFICATION while attempts remain", () => {
     expect(
       allowedActions({
+        ...base,
         state: "NEEDS_CLARIFICATION",
         isCreator: true,
         bidCount: 2,
@@ -59,6 +70,7 @@ describe("allowedActions", () => {
   it("does not offer retry_judgment once attempts are exhausted", () => {
     expect(
       allowedActions({
+        ...base,
         state: "NEEDS_CLARIFICATION",
         isCreator: true,
         bidCount: 2,

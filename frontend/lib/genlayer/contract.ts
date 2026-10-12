@@ -20,6 +20,7 @@ export type RfqState =
   | "AWARDED"
   | "NO_VALID_BID"
   | "NEEDS_CLARIFICATION"
+  | "APPEAL_PENDING"
   | "CANCELLED";
 
 export interface RfqView {
@@ -36,6 +37,13 @@ export interface RfqView {
    * never a caller-asserted value. */
   soft_policy_hash: string;
   soft_policy_text: string;
+  criteria_json: string;
+  criteria_hash: string;
+  terms_hash: string;
+  sealed_bids: boolean;
+  minimum_accepted_wins: number;
+  reveal_period_seconds: number;
+  reveal_deadline: string;
   state: RfqState;
   bid_ids: number[];
   winning_bid_id: number;
@@ -43,6 +51,10 @@ export interface RfqView {
   max_judgment_attempts: number;
   accepted: boolean;
   accepted_at: number;
+  appeal_used: boolean;
+  appeal_bid_id: number;
+  appeal_reason: string;
+  appeal_result: string;
   created_at: number;
 }
 
@@ -56,6 +68,8 @@ export interface BidView {
   price_cents: number;
   latency_ms: number;
   evidence_url: string;
+  revealed: boolean;
+  seller_wins_at_bid: number;
   eliminated: boolean;
   elimination_reason: string;
 }
@@ -64,15 +78,22 @@ export interface AwardReceiptView {
   rfq_id: number;
   rfq_hash: string;
   policy_hash: string;
+  criteria_hash: string;
+  terms_hash: string;
   state: RfqState;
   winning_bid_id: number;
   verdict: string;
   judgment_attempts: number;
+  judgment_history: string;
+  appeal_used: boolean;
+  appeal_bid_id: number;
+  appeal_result: string;
   accepted: boolean;
   accepted_at: number;
   finality_status:
     | "ACCEPTED_FINAL"
     | "AWARDED_PENDING_ACCEPTANCE"
+    | "AWARD_APPEAL_PENDING"
     | "NEEDS_CLARIFICATION_PENDING_RETRY"
     | "NO_VALID_BID_FINAL"
     | "CANCELLED_FINAL"
@@ -213,6 +234,31 @@ export function createRfq(
   );
 }
 
+export function createRfqWithOptions(
+  account: Address,
+  params: {
+    rfqSpecText: string;
+    deadline: string;
+    hardBudgetCents: number;
+    hardLatencyMsMax: number;
+    softPolicyText: string;
+    criteriaJson: string;
+    sealedBids: boolean;
+    minimumAcceptedWins: number;
+    revealPeriodSeconds: number;
+  },
+  onState: (state: WriteLifecycleState, detail?: unknown) => void
+) {
+  return writeAndTrack(
+    account,
+    "create_rfq_with_options",
+    [params.rfqSpecText, params.deadline, params.hardBudgetCents,
+      params.hardLatencyMsMax, params.softPolicyText, params.criteriaJson,
+      params.sealedBids, params.minimumAcceptedWins, params.revealPeriodSeconds],
+    onState
+  );
+}
+
 export function submitBid(
   account: Address,
   params: {
@@ -232,6 +278,31 @@ export function submitBid(
     [params.rfqId, params.priceCents, params.latencyMs, params.evidenceUrl],
     onState
   );
+}
+
+export function commitBid(account: Address, rfqId: number, commitmentHash: string, onState: (state: WriteLifecycleState, detail?: unknown) => void) {
+  return writeAndTrack(account, "commit_bid", [rfqId, commitmentHash], onState);
+}
+
+export function revealBid(account: Address, rfqId: number, commitmentId: number, params: { priceCents: number; latencyMs: number; evidenceUrl: string; salt: string }, onState: (state: WriteLifecycleState, detail?: unknown) => void) {
+  return writeAndTrack(account, "reveal_bid", [rfqId, commitmentId, params.priceCents, params.latencyMs, params.evidenceUrl, params.salt], onState);
+}
+
+export function openAppeal(account: Address, rfqId: number, bidId: number, reason: string, onState: (state: WriteLifecycleState, detail?: unknown) => void) {
+  return writeAndTrack(account, "open_appeal", [rfqId, bidId, reason], onState);
+}
+
+export function resolveAppeal(account: Address, rfqId: number, onState: (state: WriteLifecycleState, detail?: unknown) => void) {
+  return writeAndTrack(account, "resolve_appeal", [rfqId], onState);
+}
+
+export async function readSellerReputation(seller: Address) {
+  const client = getReadClient();
+  return client.readContract({
+    address: requireAddress(),
+    functionName: "get_seller_reputation",
+    args: [seller],
+  });
 }
 
 export function closeBidding(

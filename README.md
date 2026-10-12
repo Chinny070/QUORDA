@@ -32,27 +32,13 @@ gltest.config.yaml             Network config, pinned to studio_devnet (61997)
 
 ## Live deployment
 
-Deployed to Studio Next at `0x7e65fA3ee7ccE080E5FD8E70A38fDa1dc795F0F5`
-(chain 61997). All four mandatory scenarios, plus deadline enforcement,
-have been run live against it:
-
-- **Clean pass** — real validator consensus AWARDED the bid with the
-  strongest refund/support/uptime evidence, then the buyer accepted it to
-  `ACCEPTED_FINAL`.
-- **Negative case** — an over-budget bid was eliminated deterministically;
-  `judge_award` was never invoked (`judgment_attempts: 0`).
-- **Uncertainty case** — with unreachable evidence, validators correctly
-  returned `NEEDS_CLARIFICATION` instead of guessing.
-- **Retry / recovery** — `retry_judgment` re-ran real consensus a second
-  time over the byte-identical policy and bid set, still fail-closed.
-- **Deadline enforcement** — a past deadline is rejected at `create_rfq`,
-  and a bid submitted after its RFQ's deadline elapses is rejected at
-  `submit_bid`, using `gl.message.datetime` as a verified, consensus-safe
-  on-chain clock.
-
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for full transaction evidence,
-verdict JSON, and the on-chain commitment/authorization/prompt-injection
-verification.
+The previously documented deployment at
+`0x7e65fA3ee7ccE080E5FD8E70A38fDa1dc795F0F5` predates the seven advanced
+features now in this repository and is **not** a deployment of the current
+contract source. Do not use it as evidence for these features. Current
+Studio Next deployment and integration status is tracked in
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md); that record must be updated only
+after a fresh 61997 deployment and receipt verification.
 
 ## Network (hackathon non-negotiable)
 
@@ -98,6 +84,20 @@ OPEN -> CANCELLED
 4. `judge_award` — the **only** entry point that touches GenLayer's non-deterministic path: an equivalence-principle (`prompt_comparative`) block fetches each surviving bid's public evidence and asks validators to converge on the same winning `bid_id`, or `NEEDS_CLARIFICATION` when evidence is missing/contradictory/tied. Evidence is explicitly framed to validators as untrusted, unverified claims — never instructions — with dedicated rules against prompt injection.
 5. `retry_judgment(rfq_id)` — if judgment lands on `NEEDS_CLARIFICATION`, the buyer (only) can retry. It takes no other parameters: the exact same `soft_policy_text` and surviving bid set are re-read from storage, so a retry can never rewrite the policy or bids. Bounded by `MAX_JUDGMENT_ATTEMPTS` (5). Still fail-closed — a retry only reaches `AWARDED` when evidence genuinely supports a winner.
 6. `accept_award` — buyer confirms; `get_award_receipt` exposes a portable receipt (policy hash, verdict, judgment attempt count, finality status) downstream systems can reference.
+
+## Advanced procurement features
+
+The advanced create form commits these choices before bids are accepted:
+
+- **One-round seller appeal:** a non-winning, non-eliminated seller may appeal an unaccepted award once. The buyer starts a second GenLayer consensus review against the original policy, criteria, surviving bids, and public evidence. The seller's appeal text is untrusted input and cannot rewrite buyer preferences.
+- **Accepted-win reputation:** seller history counts submitted bids, hard eliminations, clarification events, and buyer-accepted wins. An RFQ may set a minimum accepted-win floor; each bid stores the seller's reputation snapshot at submission/commit time. Losses and clarification outcomes do not subtract reputation.
+- **Evidence fingerprints:** each available source body fetched at judgment receives a Keccak256 fingerprint in the verdict/receipt. A fingerprint proves which bytes the leader returned for that judgment, not that a seller's claim is true or that the URL will remain available.
+- **Weighted criteria:** buyers may specify 2–5 named criteria with integer weights totaling 100. Validators return cited 0–100 criterion ratings; contract code computes weighted totals and awards only a unique highest score. Missing sources, malformed ratings, low confidence, or a tie fail closed to `NEEDS_CLARIFICATION`.
+- **Agent SDK:** `frontend/lib/agent-sdk.ts` exposes EIP-1193-based reads and fee-aware writes for buyer/seller agents. It verifies chain 61997 and emits fee-estimation, wallet-approval, submission, consensus, decision, finality, and failure states. It contains no private-key handling or hosted backend.
+- **Verifiable receipt export:** RFQ detail pages download JSON containing the chain, contract, policy/criteria/terms commitments, bid records, consensus verdict/history, evidence fingerprints, acceptance state, and locally observed transaction references. Anyone can compare the on-chain fields with the contract reads.
+- **Sealed bids:** sellers commit a hash of RFQ ID, seller address, price, latency, evidence URL, and a 32-byte salt. Terms are stored as hidden zero values until the seller reveals during the committed reveal window. The browser can save a local reveal file; sellers must keep a backup because the contract cannot recover a lost salt.
+
+Sealed bids hide bid terms until reveal but do not conceal seller identity or commitment timing, and the current public testnet UI stores reveal secrets in that browser's local storage unless the seller downloads a backup. These are transparent testnet trade-offs, not a claim of production privacy.
 
 ## Running it
 

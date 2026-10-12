@@ -15,6 +15,9 @@ describe("award verdict presentation", () => {
       findings: ["Bid 4 documents 24/7 support."],
       questions: [],
       evidenceRefs: ["4"],
+      weightedScores: [],
+      evidenceCommitments: {},
+      evidenceStatus: {},
     });
   });
 

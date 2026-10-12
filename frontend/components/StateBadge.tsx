@@ -4,6 +4,7 @@ const LABELS: Record<string, string> = {
   FILTERED: "Hard-filtered",
   UNDER_JUDGMENT: "Under validator judgment",
   AWARDED: "Awarded",
+  APPEAL_PENDING: "Award appeal pending",
   NO_VALID_BID: "No valid bid",
   NEEDS_CLARIFICATION: "Needs clarification",
   CANCELLED: "Cancelled",

@@ -5,7 +5,9 @@ export type LifecycleAction =
   | "filter_hard_constraints"
   | "judge_award"
   | "retry_judgment"
-  | "accept_award";
+  | "accept_award"
+  | "open_appeal"
+  | "resolve_appeal";
 
 /**
  * Single source of truth for which lifecycle action buttons the UI may
@@ -21,17 +23,25 @@ export function allowedActions(params: {
   accepted: boolean;
   judgmentAttempts: number;
   maxJudgmentAttempts: number;
+  hasLosingBid: boolean;
+  appealUsed: boolean;
+  sealedBids: boolean;
+  revealDeadline: string;
+  nowMs: number;
 }): LifecycleAction[] {
-  const { state, isCreator, bidCount, accepted, judgmentAttempts, maxJudgmentAttempts } = params;
-  if (!isCreator) return [];
+  const { state, isCreator, bidCount, accepted, judgmentAttempts, maxJudgmentAttempts, hasLosingBid, appealUsed, sealedBids, revealDeadline, nowMs } = params;
 
   const actions: LifecycleAction[] = [];
-  if (state === "OPEN" && bidCount > 0) actions.push("close_bidding");
-  if (state === "BIDDING_CLOSED") actions.push("filter_hard_constraints");
-  if (state === "FILTERED") actions.push("judge_award");
-  if (state === "NEEDS_CLARIFICATION" && judgmentAttempts < maxJudgmentAttempts) {
-    actions.push("retry_judgment");
+  if (isCreator) {
+    if (state === "OPEN" && bidCount > 0 && (!sealedBids || nowMs >= Date.parse(revealDeadline))) actions.push("close_bidding");
+    if (state === "BIDDING_CLOSED") actions.push("filter_hard_constraints");
+    if (state === "FILTERED") actions.push("judge_award");
+    if (state === "NEEDS_CLARIFICATION" && judgmentAttempts < maxJudgmentAttempts) {
+      actions.push("retry_judgment");
+    }
+    if (state === "AWARDED" && !accepted) actions.push("accept_award");
+    if (state === "APPEAL_PENDING") actions.push("resolve_appeal");
   }
-  if (state === "AWARDED" && !accepted) actions.push("accept_award");
+  if (state === "AWARDED" && !isCreator && !accepted && hasLosingBid && !appealUsed) actions.push("open_appeal");
   return actions;
 }

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useWallet } from "@/lib/wallet-context";
-import { createRfq, type WriteLifecycleState } from "@/lib/genlayer/contract";
+import { createRfqWithOptions, type WriteLifecycleState } from "@/lib/genlayer/contract";
 import { LifecycleTrack } from "@/components/LifecycleTrack";
 import { explorerTxUrl } from "@/lib/genlayer/chain";
 import { friendlyErrorMessage, isLikelyNetworkError } from "@/lib/errors";
@@ -27,6 +27,11 @@ export default function NewRfqPage() {
   );
 
   const [reviewed, setReviewed] = useState(false);
+  const [weightedScoring, setWeightedScoring] = useState(false);
+  const [criteriaJson, setCriteriaJson] = useState('[{"name":"Support","description":"Coverage and response commitments","weight":40},{"name":"Refunds","description":"Clarity and completeness of refund terms","weight":30},{"name":"Reliability","description":"Public uptime history and delivery evidence","weight":30}]');
+  const [sealedBids, setSealedBids] = useState(false);
+  const [minimumAcceptedWins, setMinimumAcceptedWins] = useState("0");
+  const [revealPeriodSeconds, setRevealPeriodSeconds] = useState("300");
 
   const [state, setState] = useState<WriteLifecycleState | null>(null);
   const [failed, setFailed] = useState(false);
@@ -44,7 +49,7 @@ export default function NewRfqPage() {
     setFailed(false);
     setState(null);
     try {
-      const { txHash } = await createRfq(
+      const { txHash } = await createRfqWithOptions(
         address,
         {
           rfqSpecText: rfqSpec,
@@ -52,6 +57,10 @@ export default function NewRfqPage() {
           hardBudgetCents: Math.round(parseFloat(budgetDollars) * 100),
           hardLatencyMsMax: parseInt(latencyMs, 10),
           softPolicyText: softPolicy,
+          criteriaJson: weightedScoring ? criteriaJson : "[]",
+          sealedBids,
+          minimumAcceptedWins: parseInt(minimumAcceptedWins, 10) || 0,
+          revealPeriodSeconds: sealedBids ? parseInt(revealPeriodSeconds, 10) : 0,
         },
         setState
       );
@@ -107,6 +116,30 @@ export default function NewRfqPage() {
             <label htmlFor="policy">How should qualifying offers be compared?</label>
             <textarea id="policy" rows={4} value={softPolicy} onChange={(e) => setSoftPolicy(e.target.value)} />
           </div>
+          <details className="verification-details">
+            <summary>Advanced procurement options</summary>
+            <label className="option-row">
+              <input type="checkbox" checked={weightedScoring} onChange={(e) => setWeightedScoring(e.target.checked)} />
+              <span><strong>Use weighted criteria</strong><br /><span className="dim small">Validators rate each published criterion from 0–100; the contract computes the weighted totals. Weights must add to 100. Missing evidence and ties produce clarification.</span></span>
+            </label>
+            {weightedScoring && <div className="field">
+              <label htmlFor="criteria">Criteria JSON (2–5 criteria, weights total 100)</label>
+              <textarea id="criteria" rows={7} value={criteriaJson} onChange={(e) => setCriteriaJson(e.target.value)} spellCheck={false} />
+            </div>}
+            <label className="option-row">
+              <input type="checkbox" checked={sealedBids} onChange={(e) => setSealedBids(e.target.checked)} />
+              <span><strong>Seal bids until the reveal window</strong><br /><span className="dim small">Sellers publish a commitment before the bid deadline, then reveal terms during the configured window afterward. They must keep their private reveal file.</span></span>
+            </label>
+            {sealedBids && <div className="field">
+              <label htmlFor="reveal-period">Reveal window after bid deadline (seconds, 60–604800)</label>
+              <input id="reveal-period" type="number" min="60" max="604800" value={revealPeriodSeconds} onChange={(e) => setRevealPeriodSeconds(e.target.value)} />
+            </div>}
+            <div className="field">
+              <label htmlFor="reputation-floor">Minimum prior accepted awards (0 disables this filter)</label>
+              <input id="reputation-floor" type="number" min="0" value={minimumAcceptedWins} onChange={(e) => setMinimumAcceptedWins(e.target.value)} />
+              <span className="dim small">This uses only prior buyer-accepted awards recorded by this contract. New sellers can qualify when the floor is zero.</span>
+            </div>
+          </details>
           <button className="btn" onClick={() => setReviewed(true)}>Review before submitting →</button>
         </div>
       ) : (
@@ -116,6 +149,9 @@ export default function NewRfqPage() {
           <p className="small"><strong>Hard latency ceiling:</strong> {latencyMs}ms</p>
           <p className="small"><strong>Soft priorities:</strong> {softPolicy}</p>
           <p className="small dim">RFQ spec: {rfqSpec}</p>
+          <p className="small"><strong>Scoring:</strong> {weightedScoring ? "Weighted criteria are committed with this RFQ." : "Natural-language comparison among qualifying bids."}</p>
+          <p className="small"><strong>Bid visibility:</strong> {sealedBids ? `Sealed, with a ${revealPeriodSeconds}-second reveal window.` : "Public when submitted."}</p>
+          <p className="small"><strong>Minimum prior accepted awards:</strong> {minimumAcceptedWins}</p>
 
           {state && <LifecycleTrack current={state} failed={failed} />}
           {error && (

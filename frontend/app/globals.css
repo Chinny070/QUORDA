@@ -269,6 +269,19 @@ a:hover { text-decoration: underline; }
 }
 .receipt-section ul { margin: 8px 0 0; padding-left: 20px; }
 .receipt-section li { margin: 5px 0; }
+.seller-track-record { display: flex; flex-direction: column; gap: 3px; min-width: 150px; }
+.option-row { display: flex; align-items: flex-start; gap: 12px; margin: 14px 0; cursor: pointer; }
+.option-row input { margin-top: 3px; accent-color: var(--color-lavender); }
+.field select {
+  width: 100%;
+  background: var(--color-mist);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-inputs);
+  padding: 10px 12px;
+  color: var(--text);
+  font-size: 0.92rem;
+  font-family: inherit;
+}
 
 table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 0.88rem; }

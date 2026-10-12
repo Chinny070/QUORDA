@@ -184,3 +184,95 @@ def test_bid_commitment_binds_every_material_field():
 
 def test_max_judgment_attempts_is_a_positive_bound():
     assert quorda.MAX_JUDGMENT_ATTEMPTS > 0
+
+
+def test_scoring_criteria_require_two_to_five_unique_names_totaling_100():
+    valid = '[{"name":"Support","description":"Support coverage","weight":60},{"name":"Refunds","description":"Refund terms","weight":40}]'
+    assert quorda._validate_scoring_criteria(valid)
+    assert not quorda._validate_scoring_criteria('[{"name":"Support","description":"x","weight":60},{"name":"Support","description":"y","weight":40}]')
+    assert not quorda._validate_scoring_criteria('[{"name":"Support","description":"x","weight":50},{"name":"Refunds","description":"y","weight":40}]')
+    assert not quorda._validate_scoring_criteria('[{"name":"Only","description":"x","weight":100}]')
+
+
+def _weighted_fixture(scores_a=(90, 50), scores_b=(70, 80), confidence="high"):
+    criteria = [
+        {"name": "Support", "description": "Support coverage", "weight": 60},
+        {"name": "Refunds", "description": "Refund terms", "weight": 40},
+    ]
+    raw = {
+        "decision": "999",  # contract must ignore a model-proposed winner
+        "confidence_band": confidence,
+        "ratings": [
+            {"bid_id": "1", "ratings": [
+                {"criterion": "Support", "score": scores_a[0], "finding": "specific support claim", "evidence_refs": ["1"]},
+                {"criterion": "Refunds", "score": scores_a[1], "finding": "refund claim", "evidence_refs": ["1"]},
+            ]},
+            {"bid_id": "2", "ratings": [
+                {"criterion": "Support", "score": scores_b[0], "finding": "support claim", "evidence_refs": ["2"]},
+                {"criterion": "Refunds", "score": scores_b[1], "finding": "refund claim", "evidence_refs": ["2"]},
+            ]},
+        ],
+    }
+    return raw, criteria
+
+
+def test_weighted_result_uses_deterministic_contract_total():
+    raw, criteria = _weighted_fixture()
+    result = quorda._weighted_verdict(
+        raw, [1, 2], criteria, "policy", {"1": "AVAILABLE_UNVERIFIED", "2": "AVAILABLE_UNVERIFIED"}
+    )
+    # 1: 90*60 + 50*40 = 7400; 2: 70*60 + 80*40 = 7400 => tie.
+    assert result["decision"] == "NEEDS_CLARIFICATION"
+
+
+def test_weighted_result_awards_unique_top_score_and_ignores_model_decision():
+    raw, criteria = _weighted_fixture(scores_a=(95, 80), scores_b=(70, 75))
+    result = quorda._weighted_verdict(
+        raw, [1, 2], criteria, "policy", {"1": "AVAILABLE_UNVERIFIED", "2": "AVAILABLE_UNVERIFIED"}
+    )
+    assert result["decision"] == "1"
+    assert result["weighted_scores"][0]["weighted_total_basis_points"] == 8900
+
+
+def test_weighted_result_fails_closed_for_unavailable_source_or_low_confidence():
+    raw, criteria = _weighted_fixture(scores_a=(99, 95), scores_b=(50, 30))
+    unavailable = quorda._weighted_verdict(
+        raw, [1, 2], criteria, "policy", {"1": "AVAILABLE_UNVERIFIED", "2": "SOURCE_UNAVAILABLE"}
+    )
+    low_confidence = quorda._weighted_verdict(
+        _weighted_fixture(scores_a=(99, 95), scores_b=(50, 30), confidence="low")[0],
+        [1, 2], criteria, "policy", {"1": "AVAILABLE_UNVERIFIED", "2": "AVAILABLE_UNVERIFIED"}
+    )
+    assert unavailable["decision"] == "NEEDS_CLARIFICATION"
+    assert low_confidence["decision"] == "NEEDS_CLARIFICATION"
+
+
+def test_weighted_result_rejects_missing_or_out_of_set_citations():
+    raw, criteria = _weighted_fixture(scores_a=(99, 95), scores_b=(50, 30))
+    raw["ratings"][0]["ratings"][0]["evidence_refs"] = ["999"]
+    result = quorda._weighted_verdict(
+        raw, [1, 2], criteria, "policy", {"1": "AVAILABLE_UNVERIFIED", "2": "AVAILABLE_UNVERIFIED"}
+    )
+    assert result["decision"] == "NEEDS_CLARIFICATION"
+
+
+def test_non_weighted_verdict_cannot_award_when_any_evidence_is_absent():
+    proposed_award = quorda._parse_verdict(
+        {"decision": "1", "confidence_band": "high"}, [1, 2], "policy"
+    )
+    result = quorda._fail_closed_for_evidence(
+        proposed_award,
+        {"1": "AVAILABLE_UNVERIFIED", "2": "SOURCE_UNAVAILABLE"},
+    )
+    assert result["decision"] == "NEEDS_CLARIFICATION"
+
+
+def test_non_weighted_verdict_can_award_only_when_every_source_is_available():
+    proposed_award = quorda._parse_verdict(
+        {"decision": "1", "confidence_band": "high"}, [1, 2], "policy"
+    )
+    result = quorda._fail_closed_for_evidence(
+        proposed_award,
+        {"1": "AVAILABLE_UNVERIFIED", "2": "AVAILABLE_UNVERIFIED"},
+    )
+    assert result["decision"] == "1"
