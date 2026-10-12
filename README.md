@@ -32,13 +32,14 @@ gltest.config.yaml             Network config, pinned to studio_devnet (61997)
 
 ## Live deployment
 
-The previously documented deployment at
-`0x7e65fA3ee7ccE080E5FD8E70A38fDa1dc795F0F5` predates the seven advanced
-features now in this repository and is **not** a deployment of the current
-contract source. Do not use it as evidence for these features. Current
-Studio Next deployment and integration status is tracked in
-[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md); that record must be updated only
-after a fresh 61997 deployment and receipt verification.
+Current Studio Next deployment (chain 61997):
+`0x7BAeb6DF4cF5c5201c40e49Be24E13E802595BC5`.
+Deployment transaction:
+`0x89766e204d7034db1ee43f23a275fb8cb4a5af351343e43fb4cc106a02c00c2b`.
+The previous deployment at
+`0x7e65fA3ee7ccE080E5FD8E70A38fDa1dc795F0F5` is superseded. See
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for source commit, live feature
+tests, receipt evidence, and the current browser/publication status.
 
 ## Network (hackathon non-negotiable)
 
