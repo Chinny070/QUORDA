@@ -28,6 +28,11 @@ evidence for the current source.
 | Deployment date | `2026-10-12` |
 | Representative RFQ | #1, state `OPEN`, created in accepted tx `0xb0259292e00bcfa4db8d7142f360fc5f6cf494549de83fd3e34f23426b4a549c` |
 | Final-address live award RFQ | #2, two bids hard-filtered, genuine consensus award to bid #2, buyer accepted; `finality_status: ACCEPTED_FINAL` |
+| Final-address negative RFQ | #3, over-budget bid eliminated deterministically; `NO_VALID_BID`, no winner, zero judgment attempts |
+| Final-address uncertainty RFQ | #4, two unavailable evidence URLs; consensus returned `NEEDS_CLARIFICATION`, then parameterless retry remained fail-closed with same policy, constraints and bids |
+| Final-address reputation RFQ | #5, seller with one accepted win survived the floor; zero-win seller was eliminated; accepted survivor's count incremented |
+| Final-address sealed RFQ | #6, commitment hid terms, bypasses rejected, exact preimage revealed after deadline |
+| Final-address appeal RFQ | #7, losing seller opened one appeal; after two protocol disagreements, resolution reached consensus and upheld the original award |
 
 The deploy transaction finalized with consensus `ACCEPTED`. The deployer
 had `29.992422484749920757 GEN` on chain 61997 at preflight. The Studio CLI
@@ -46,11 +51,17 @@ frontend and gltest config use the hackathon RPC hostname above.
 | Clarification retry + single appeal | Pass: 2 tests, including repeated consensus, immutable policy/bids, and appeal authorization |
 | Sealed commit/reveal | Pass: 1 test, hidden terms, correct commitment preimage, timing and reveal |
 | Reputation floor | Pass: 1 test, accepted-win snapshot and deterministic filtering |
+| Agent API/SDK | Pass: included in 19 frontend unit tests; chain-61997 guard, sealed commitment preimage, fee-aware write lifecycle; no private-key or backend path |
+| Final-address `NO_VALID_BID` + `NEEDS_CLARIFICATION` retry | Pass: RFQs #3 and #4; retry held winner at zero and preserved RFQ/policy/constraints/bid IDs |
+| Final-address reputation floor | Pass: RFQ #5; seller A (0 accepted wins) eliminated, seller B (1) survived; after acceptance seller B had 2 accepted wins |
+| Final-address sealed commit/reveal | Pass: RFQ #6; hidden terms, open submission and early close rejected, exact commitment revealed after deadline |
+| Final-address single appeal round | Pass: RFQ #7; appeal result `UPHELD`, same winner/policy/bids, two judgment-history entries; two earlier resolution submissions finalized undetermined before the successful third |
+| Verifiable receipt view/export surface | Pass for on-chain receipt and production UI rendering; download control is visible. A manual file-download/re-import verification remains outstanding. |
 | Live deployment of current source | Pass: accepted deployment receipt above |
 | Deployed schema and smoke reads/writes | Pass: all 18 methods present; RFQ #1 `OPEN`; receipt `NOT_YET_AWARDED`; hashes present |
 | Production frontend build | Pass: Vercel deployment `dpl_8wEsNtJWhaqkhektqZZwcSsdhCQp`, `READY`, alias `https://quorda.vercel.app` |
-| Manual browser test against current deployment | Partial pass: production workspace reads RFQ #1; RFQ detail shows on-chain state and commitments; advanced form exposes weighted criteria, sealed bids, reputation floor. Wallet signing/action lifecycle not exercised because no injected wallet was available in the test browser. |
-| GitHub publication of current feature set | Pass: [`821b889`](https://github.com/Chinny070/QUORDA/commit/821b889359cc9d5b3937e41f69a124f1b9a14aac) pushed to [`Chinny070/QUORDA`](https://github.com/Chinny070/QUORDA) |
+| Manual browser test against current deployment | Pass for read-only lifecycle/receipt views: production pages for RFQs #2–#4 and #7 showed accepted award, `NO_VALID_BID`, `NEEDS_CLARIFICATION`, upheld appeal, citations, weighted scores and fingerprints. No wallet was connected; signing/action lifecycle remains unverified. |
+| GitHub publication of current feature set | Pass: source and deployment evidence are pushed to [`Chinny070/QUORDA`](https://github.com/Chinny070/QUORDA); deployed source commit is `39f5ffd9d1d259140b8fc561acf86e5fdd28edcc`. |
 | Vercel publication of current feature set | Pass: production alias above |
 
 An earlier live test run uncovered a bad integration assertion/harness that
@@ -121,14 +132,52 @@ versus bid #1 at 1600. The receipt is viewable at
 and the acceptance transaction at
 `https://explorer-studio-dev.genlayer.com/tx/0x5afebf8cb58e93edf7d0eef80634c42d6aa4381e6494ef4c53475c7a1230e8b8`.
 
-Still not demonstrated on the final contract address:
+Final-address negative and uncertainty evidence:
 
-1. `NO_VALID_BID` and uncertainty/retry flows as a single audited set of
-   transactions on this exact address (they did pass against fresh Studio Next
-   test deployments of the same source).
-2. Injected-wallet signing and the complete fee/decision/finality UI lifecycle
-   in a browser with a real compatible wallet. The manual browser used for the
-   production check did not expose an injected wallet.
+| RFQ | Action | Transaction / result |
+| --- | --- | --- |
+| #3 | Create | `0x89f6b0e13e0570a07c5f8957168759d0c0b5c2beb9752fde009c8f6eae02ab74` |
+| #3 | Submit over-budget bid | `0x61248be415323d6b70ad93c614848ab7ee0b989fb01ea21c13cd0c602406f4c6` |
+| #3 | Close / hard filter | `0xb32a91b9995648dd0e76e6888ed721b0ed34df45dd76c0e2b5f52b0c185690d3` / `0x053bc2fe031fe6b0dbb9b5da8eecc691d140e3b5a286a68d5a2b335f42ca0c5a`; state `NO_VALID_BID`, winner `0`, judgment attempts `0` |
+| #4 | Create | `0x8d72e4a8be3630694d05ac34c68f9ff3ee437d4c34f052363a3819e40cc2afa2` |
+| #4 | Submit bids #4 and #5 | `0xb5578c018941e2b5601ae3f0c7b883dc3a0bbd44af836a02eaf780ca6ba42518` / `0x4f95fb8e02240d4d60024dee0869a3f5a58601972648b11fb532a7b0b2086307` |
+| #4 | Close / hard filter | `0xbb1edeaa3323f8340774db6a3a86361ba894eba364b5ae18e74fcb227cd4ae92` / `0x604d517c43a92dbd909e617a7c14640f2601ceffe02e4aa321b0b84871d67658` |
+| #4 | Genuine consensus judgment | `0x01df5fc4b73f91f3af5b877349bf9862b0494c62ec6d0c7ddf02a04869305a90`; `NEEDS_CLARIFICATION`, no winner |
+| #4 | `retry_judgment` | `0x304f326f108486037b01627e5f1b89d1e23fb7e9fb3d8941f47c8416d2266908`; `NEEDS_CLARIFICATION`, attempts `2`, winner `0`; RFQ commitment, policy hash/text, hard constraints, and bid IDs unchanged |
+
+The production pages for RFQs #2, #3, #4, and #7 were opened and manually checked:
+the UI showed the accepted award and cited findings/weighted scores/evidence
+fingerprints; the deterministic elimination and `NO_VALID_BID`; and
+`NEEDS_CLARIFICATION`, `SOURCE_UNAVAILABLE` evidence statuses, receipt, and
+retry explanation, plus RFQ #7's upheld appeal, respectively. The sealed-bid
+RFQ #6 and reputation RFQ #5 were verified on-chain; their UI pages were not
+separately inspected. No wallet was connected in the in-app browser, so
+write-signing and the actual wallet approval UI remain unverified.
+
+Final-address reputation, sealed-bid, and appeal transaction evidence:
+
+| RFQ | Action | Transaction / result |
+| --- | --- | --- |
+| #5 | Create with one accepted-win floor | `0x8be8bccfabd2a6fef01fe4587617850f95f2e12ff55dafbaa7723aec30d5b875` |
+| #5 | Seller A / seller B bids | `0xc9ae2830b04cc3b831eaafa28469b36d7c6177b49d0360029b74a70535e3cf94` / `0x8aaf0277a6d06f46e45fb48bf5dda3f85df3baa34a206ee39e2779c661a6a879` |
+| #5 | Close / filter | `0x67337834e7924935c06cd01ff2b6fec693c5ff42a5674e3987cc632f45b8bf12` / `0x3a30ba2feb698df928eaaabfa6aa24f712cf535301950d894742519f886ae3a1`; seller A eliminated as `BELOW_REPUTATION_FLOOR`; seller B survived |
+| #5 | Deterministic award / acceptance | `0x3fcc2cc0427415185cb823a0f13420062e91cc077237758aa0b35449ceee5a02` / `0xe59e341ca9297d0478aab4b531f03e71152517d6567d618574aff1db32e5244f`; seller B accepted-win count increased from 1 to 2 |
+| #6 | Create sealed RFQ / commit bid #8 | `0x3d26da8874f8387e7bf3922c7121fd3f7070012f05f64106c6fc282398936473` / `0x5a4ed84027991615bc942f5269a96687cafbe7f6177ee0a6a3d6ea6f3a339033` |
+| #6 | Open-bid bypass / early close (both rejected) | `0xe07427fc468520d2cb9b0805c0cbb4de6d95f0ea28e72bdeaf3802a1e821cd8d` / `0x0531cce6b36542329d6c2f1dee822b5f56a98f3a86de93f734a5b9446d1b68b4` |
+| #6 | Reveal after deadline | `0x0d8b40d0b7f7e83da3ca0d73178680c95b48e2097429320fbe3d1b1eb5b2fddc`; stored commitment matched `rfq_id|seller|price|latency|evidence_url|salt`, terms became visible only after reveal |
+| #7 | Resolution attempts 1 and 2 | `0x967a7f975610405b2d7b19179a522c08a404b64966da7d53a2967ee986bcf93e` and `0xf05c6960f75bd00fff8d3ccf78201415602903edf538e7e5e0c60686474bfc08`; both finalized `MAJORITY_DISAGREE` without contract-state change |
+| #7 | Resolution attempt 3 | `0x0f92d88fd422046400642cdf715e320cf980150a5a8b2e5473e65742a8e17f0e`; consensus `UPHELD`, winner bid #10, judgment history has original judgment + appeal, `AWARDED_PENDING_ACCEPTANCE` |
+
+Still not demonstrated:
+
+1. Injected-wallet signing and the complete fee/decision/finality UI lifecycle
+   in a browser with a real compatible wallet. The production UI was manually
+   checked in read-only mode; connecting would disclose a wallet address and
+   request the wallet's network-switch permission. That action was not taken.
+2. Actually downloading the on-page receipt JSON in a browser and re-reading
+   its contents. The button is present and the JSON export implementation is
+   covered by the frontend code/build, but the file-transfer interaction was
+   not manually exercised.
 
 Do not claim these remaining final-address/browser checks as completed until
 their evidence is added below. If contract code changes, redeploy and replace
@@ -139,6 +188,4 @@ privacy and production settlement are outside this deployment's guarantees.
 
 Keep the deployment source commit fixed. If contract code changes, redeploy
 and replace the deployment record; never attribute the address above to a
-different source commit. For each remaining live scenario, retain the RFQ
-ID, transaction hashes, final on-chain state, and (for judgments) the
-receipt/verdict. Record testnet/privacy limitations accurately.
+different source commit. Record testnet/privacy limitations accurately.
