@@ -60,9 +60,9 @@ frontend and gltest config use the hackathon RPC hostname above.
 | Verifiable receipt view/export surface | Pass for on-chain receipt and production UI rendering; download control is visible. A manual file-download/re-import verification remains outstanding. |
 | Live deployment of current source | Pass: accepted deployment receipt above |
 | Deployed schema and smoke reads/writes | Pass: all 18 methods present; RFQ #1 `OPEN`; receipt `NOT_YET_AWARDED`; hashes present |
-| Production frontend build | Pass: Vercel deployment `dpl_8wEsNtJWhaqkhektqZZwcSsdhCQp`, `READY`, alias `https://quorda.vercel.app` |
+| Production frontend build | Pass: Vercel deployment `dpl_6nLDwAp9Tjd44akBq8q1thSN6Jh8`, `READY`, alias `https://quorda.vercel.app`, frontend commit `748ba549de4fe5a7757d34388b46ed6126affd4a` |
 | Manual browser test against current deployment | Pass for read-only lifecycle/receipt views: production pages for RFQs #2–#4 and #7 showed accepted award, `NO_VALID_BID`, `NEEDS_CLARIFICATION`, upheld appeal, citations, weighted scores and fingerprints. No wallet was connected; signing/action lifecycle remains unverified. |
-| GitHub publication of current feature set | Pass: source and deployment evidence are pushed to [`Chinny070/QUORDA`](https://github.com/Chinny070/QUORDA); deployed source commit is `39f5ffd9d1d259140b8fc561acf86e5fdd28edcc`. |
+| GitHub publication of current feature set | Pass: contract source commit `39f5ffd9d1d259140b8fc561acf86e5fdd28edcc` and frontend/evidence commit `748ba549de4fe5a7757d34388b46ed6126affd4a` are pushed to [`Chinny070/QUORDA`](https://github.com/Chinny070/QUORDA). |
 | Vercel publication of current feature set | Pass: production alias above |
 
 An earlier live test run uncovered a bad integration assertion/harness that
