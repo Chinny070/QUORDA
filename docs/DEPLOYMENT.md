@@ -52,16 +52,16 @@ frontend and gltest config use the hackathon RPC hostname above.
 | Sealed commit/reveal | Pass: 1 test, hidden terms, correct commitment preimage, timing and reveal |
 | Reputation floor | Pass: 1 test, accepted-win snapshot and deterministic filtering |
 | Agent API/SDK | Pass: included in 21 frontend unit tests; chain-61997 guard, sealed commitment preimage, fee-aware write lifecycle; no private-key or backend path |
-| Receipt export serialization | Pass: 2 focused tests verify Studio Next metadata, contract-read payload, parsed verdict, observed transaction references, and filename. Browser-triggered file download remains unverified. |
+| Receipt export serialization | Pass: 2 focused tests verify Studio Next metadata, contract-read payload, parsed verdict, observed transaction references, and filename. Production RFQ #2 download was clicked and the UI confirmed `Receipt JSON downloaded`; file contents were not independently reopened. |
 | Final-address `NO_VALID_BID` + `NEEDS_CLARIFICATION` retry | Pass: RFQs #3 and #4; retry held winner at zero and preserved RFQ/policy/constraints/bid IDs |
 | Final-address reputation floor | Pass: RFQ #5; seller A (0 accepted wins) eliminated, seller B (1) survived; after acceptance seller B had 2 accepted wins |
 | Final-address sealed commit/reveal | Pass: RFQ #6; hidden terms, open submission and early close rejected, exact commitment revealed after deadline |
 | Final-address single appeal round | Pass: RFQ #7; appeal result `UPHELD`, same winner/policy/bids, two judgment-history entries; two earlier resolution submissions finalized undetermined before the successful third |
-| Verifiable receipt view/export surface | Pass for on-chain receipt and production UI rendering; download control is visible. A manual file-download/re-import verification remains outstanding. |
+| Verifiable receipt view/export surface | Pass for on-chain receipt, production UI rendering, and a browser-triggered download. Reopening the downloaded file and comparing every field remains outstanding. |
 | Live deployment of current source | Pass: accepted deployment receipt above |
 | Deployed schema and smoke reads/writes | Pass: all 18 methods present; RFQ #1 `OPEN`; receipt `NOT_YET_AWARDED`; hashes present |
 | Production frontend build | Pass: Vercel deployment `dpl_6nLDwAp9Tjd44akBq8q1thSN6Jh8`, `READY`, alias `https://quorda.vercel.app`, frontend commit `748ba549de4fe5a7757d34388b46ed6126affd4a` |
-| Manual browser test against current deployment | Pass for read-only lifecycle/receipt views: production pages for RFQs #2–#4 and #7 showed accepted award, `NO_VALID_BID`, `NEEDS_CLARIFICATION`, upheld appeal, citations, weighted scores and fingerprints. No wallet was connected; signing/action lifecycle remains unverified. |
+| Manual browser test against current deployment | Pass for read-only lifecycle/receipt views: production pages for RFQs #2–#4 and #7 showed accepted award, `NO_VALID_BID`, `NEEDS_CLARIFICATION`, upheld appeal, citations, weighted scores and fingerprints. RFQ #2 receipt download returned a success message. No wallet was connected; signing/action lifecycle remains unverified. |
 | GitHub publication of current feature set | Pass: contract source commit `39f5ffd9d1d259140b8fc561acf86e5fdd28edcc` and frontend/evidence commit `748ba549de4fe5a7757d34388b46ed6126affd4a` are pushed to [`Chinny070/QUORDA`](https://github.com/Chinny070/QUORDA). |
 | Vercel publication of current feature set | Pass: production alias above |
 
@@ -155,6 +155,11 @@ RFQ #6 and reputation RFQ #5 were verified on-chain; their UI pages were not
 separately inspected. No wallet was connected in the in-app browser, so
 write-signing and the actual wallet approval UI remain unverified.
 
+On 2026-10-12, the production RFQ #2 `Download verifiable receipt JSON` control
+was activated in a separate in-app browser. The page confirmed
+`Receipt JSON downloaded`. The downloaded file was not reopened and compared
+field-by-field with live contract reads.
+
 ## Fresh verification on 2026-10-12
 
 After confirming `eth_chainId` returned `0xf22d` (61997), the pinned local
@@ -173,20 +178,20 @@ transient failures only for idempotent RPC reads, including `eth_estimateGas`
 and `eth_getTransactionCount`; it never automatically resubmits
 `eth_sendRawTransaction`.
 
-The reputation/options, sealed-bid, and appeal revalidation attempts did not
-complete: Studio Next reset or timed out the HTTPS connection during write
-submission. Those attempts returned no transaction hash, so this latest
-revalidation is not a clean full-suite pass and no receipt can be attributed to
-those individual attempts. Latest/pending nonce queries showed no pending
-transactions at the time checked. Their successful final-address live evidence
-remains the RFQ #5, #6, and #7 evidence recorded above; the failures here are
-test-network transport failures, not contrary on-chain verdicts.
+All 14 integration cases have now passed individually across targeted invocations
+against `studio_devnet`, including the later isolated reruns for reputation,
+sealed bids, and appeal. This is per-case passing evidence, not one uninterrupted
+14-test run: an earlier aggregate run was interrupted by Studio Next transport
+failures. Several first attempts failed before returning a transaction hash;
+latest/pending nonce queries showed no pending transactions when checked. No
+write retry was added because a lost `eth_sendRawTransaction` response can be
+ambiguous. The successful final-address RFQ #5, #6, and #7 evidence remains the
+independent production-deployment evidence for those three features.
 
 The current Chrome session was not available to the browser automation bridge,
 and the Windows browser window could not be activated. Therefore the injected
-wallet signing lifecycle and an actual receipt-JSON download/re-import remain
-unverified. No wallet prompt was approved or transaction signed through
-Rabby.
+wallet signing lifecycle and receipt-JSON re-import remain unverified. No
+wallet prompt was approved or transaction signed through Rabby.
 
 Final-address reputation, sealed-bid, and appeal transaction evidence:
 
@@ -208,10 +213,10 @@ Still not demonstrated:
    in a browser with a real compatible wallet. The production UI was manually
    checked in read-only mode; connecting would disclose a wallet address and
    request the wallet's network-switch permission. That action was not taken.
-2. Actually downloading the on-page receipt JSON in a browser and re-reading
-   its contents. The button is present and the JSON export implementation is
-   covered by the frontend code/build, but the file-transfer interaction was
-   not manually exercised.
+2. Reopening the downloaded JSON and comparing its contents field-by-field
+   against live contract reads. The production download interaction and JSON
+   serialization tests passed, but this independent file-content comparison
+   remains unverified.
 
 Do not claim these remaining final-address/browser checks as completed until
 their evidence is added below. If contract code changes, redeploy and replace
